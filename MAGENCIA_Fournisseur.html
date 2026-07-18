@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>MAGENCIA — Vérification accès</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
+<style>
+  :root {
+    --navy: #1B2A4A;
+    --gold: #C9A84C;
+    --bg: #F5F6FA;
+    --white: #FFFFFF;
+    --green: #059669;
+    --green-bg: #ECFDF5;
+    --red: #DC2626;
+    --red-bg: #FEF2F2;
+    --muted: #6B7A99;
+    --radius: 16px;
+    --shadow: 0 4px 24px rgba(27,42,74,0.12);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, 'Inter', sans-serif;
+    background: var(--bg);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .header {
+    background: var(--navy);
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .logo { font-size: 18px; font-weight: 800; color: white; }
+  .logo span { color: var(--gold); }
+  .header-label { font-size: 12px; color: rgba(255,255,255,0.5); }
+
+  /* SCANNER */
+  #screenScan {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+  }
+
+  .scan-title {
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--navy);
+    margin-bottom: 6px;
+  }
+  .scan-sub {
+    font-size: 14px;
+    color: var(--muted);
+    margin-bottom: 20px;
+    line-height: 1.5;
+  }
+
+  .camera-wrap {
+    position: relative;
+    border-radius: 20px;
+    overflow: hidden;
+    background: #000;
+    aspect-ratio: 1;
+    max-width: 360px;
+    margin: 0 auto 20px;
+    box-shadow: var(--shadow);
+  }
+  #video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .scan-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .scan-frame {
+    width: 65%;
+    height: 65%;
+    border: 3px solid var(--gold);
+    border-radius: 16px;
+    box-shadow: 0 0 0 9999px rgba(0,0,0,0.4);
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { border-color: var(--gold); }
+    50% { border-color: rgba(201,168,76,0.4); }
+  }
+  .scan-line {
+    position: absolute;
+    width: 65%;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--gold), transparent);
+    animation: scan 2s ease-in-out infinite;
+  }
+  @keyframes scan {
+    0% { top: 18%; }
+    100% { top: 82%; }
+  }
+
+  #canvas { display: none; }
+
+  .btn-scan {
+    width: 100%;
+    max-width: 360px;
+    margin: 0 auto;
+    display: block;
+    padding: 16px;
+    background: var(--navy);
+    color: white;
+    border: none;
+    border-radius: 14px;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-scan:active { transform: scale(0.98); }
+
+  .scan-status {
+    text-align: center;
+    font-size: 13px;
+    color: var(--muted);
+    margin-top: 12px;
+    min-height: 20px;
+  }
+
+  /* RÉSULTAT */
+  #screenResult {
+    display: none;
+    flex: 1;
+    flex-direction: column;
+    padding: 20px;
+  }
+
+  .result-hero {
+    border-radius: 24px;
+    padding: 32px 24px;
+    text-align: center;
+    margin-bottom: 20px;
+    position: relative;
+    overflow: hidden;
+  }
+  .result-hero.autorise {
+    background: var(--green-bg);
+    border: 3px solid var(--green);
+  }
+  .result-hero.refuse {
+    background: var(--red-bg);
+    border: 3px solid var(--red);
+  }
+
+  .result-icon { font-size: 64px; margin-bottom: 12px; line-height: 1; }
+  .result-verdict {
+    font-size: 36px;
+    font-weight: 900;
+    letter-spacing: -1px;
+    margin-bottom: 4px;
+  }
+  .result-hero.autorise .result-verdict { color: var(--green); }
+  .result-hero.refuse .result-verdict { color: var(--red); }
+  .result-sub { font-size: 14px; color: var(--muted); }
+
+  .info-card {
+    background: white;
+    border-radius: var(--radius);
+    padding: 20px;
+    box-shadow: var(--shadow);
+    margin-bottom: 14px;
+  }
+  .info-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-bottom: 8px;
+  }
+  .info-name {
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--navy);
+    margin-bottom: 4px;
+  }
+  .info-poste {
+    font-size: 14px;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+  .info-code {
+    font-family: monospace;
+    font-size: 12px;
+    color: var(--muted);
+    letter-spacing: 1px;
+  }
+  .info-badge {
+    display: inline-block;
+    background: #EEF2FF;
+    color: var(--navy);
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 20px;
+    margin-top: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .chantiers-list { margin-top: 4px; }
+  .chantier-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 0;
+    border-bottom: 1px solid #F1F5F9;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--navy);
+  }
+  .chantier-item:last-child { border-bottom: none; }
+  .chantier-dot {
+    width: 8px; height: 8px;
+    background: var(--green);
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .btn-retry {
+    width: 100%;
+    padding: 16px;
+    background: var(--navy);
+    color: white;
+    border: none;
+    border-radius: 14px;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    margin-bottom: 10px;
+  }
+  .btn-retry:active { transform: scale(0.98); }
+
+  .timestamp {
+    text-align: center;
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+
+  /* Manuel fallback */
+  .manual-wrap {
+    background: white;
+    border-radius: var(--radius);
+    padding: 20px;
+    box-shadow: var(--shadow);
+    margin-top: 16px;
+  }
+  .manual-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--muted);
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .manual-input {
+    width: 100%;
+    padding: 12px 14px;
+    border: 2px solid #E2E8F0;
+    border-radius: 10px;
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    font-family: monospace;
+    color: var(--navy);
+  }
+  .manual-input:focus { outline: none; border-color: var(--gold); }
+  .btn-manual {
+    width: 100%;
+    padding: 13px;
+    background: var(--gold);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    margin-top: 10px;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">MAG<span>ENCIA</span></div>
+  <div class="header-label">Espace fournisseur</div>
+</div>
+
+<!-- SCANNER -->
+<div id="screenScan">
+  <div class="scan-title">Vérifier un salarié</div>
+  <div class="scan-sub">Scannez le QR code sur le téléphone du salarié MAGENCIA pour vérifier son autorisation d'accès.</div>
+
+  <div class="camera-wrap">
+    <video id="video" autoplay playsinline muted></video>
+    <div class="scan-overlay">
+      <div class="scan-frame"></div>
+      <div class="scan-line"></div>
+    </div>
+    <canvas id="canvas"></canvas>
+  </div>
+
+  <button class="btn-scan" onclick="startCamera()">📷 Activer la caméra</button>
+  <div class="scan-status" id="scanStatus">Appuyez pour activer la caméra</div>
+
+  <div class="manual-wrap">
+    <div class="manual-title">📝 Ou saisir le code manuellement</div>
+    <input class="manual-input" id="manualCode" type="text" placeholder="MAG-XXXXXX" maxlength="12"
+      onkeydown="if(event.key==='Enter') verifyManual()">
+    <button class="btn-manual" onclick="verifyManual()">Vérifier →</button>
+  </div>
+</div>
+
+<!-- RÉSULTAT -->
+<div id="screenResult">
+  <div class="result-hero" id="resultHero">
+    <div class="result-icon" id="resultIcon">✅</div>
+    <div class="result-verdict" id="resultVerdict">AUTORISÉ</div>
+    <div class="result-sub" id="resultSub">Ce salarié est autorisé à passer commande</div>
+  </div>
+
+  <div class="info-card">
+    <div class="info-label">Identité</div>
+    <div class="info-name" id="resNom">—</div>
+    <div class="info-poste" id="resPoste">—</div>
+    <div class="info-code" id="resCode">—</div>
+    <div class="info-badge" id="resBadge">—</div>
+  </div>
+
+  <div class="info-card" id="chantiersCard">
+    <div class="info-label">🏗️ Chantiers autorisés</div>
+    <div class="chantiers-list" id="resChantiers">—</div>
+  </div>
+
+  <button class="btn-retry" onclick="resetScan()">← Scanner un autre salarié</button>
+  <div class="timestamp" id="resTimestamp"></div>
+</div>
+
+<script>
+// Base de données salarié (même que l'app salarié)
+const USERS = [
+  { code: "MAG-384729", nom: "EL MRABET Ahmed", poste: "Gérant", type: "INTERNE", chantiers: ["NOZ Brioude", "Patriarca", "Carter Cash Angoulins", "Stow Your Bags"], statut: "ACTIF" },
+  { code: "MAG-582341", nom: "DUPONT Vincent",  poste: "Chef de chantier", type: "INTERNE", chantiers: ["Carter Cash Angoulins", "Stow Your Bags"], statut: "ACTIF" },
+  { code: "EXT-114872", nom: "MARTIN Paul",     poste: "Sous-traitant", type: "EXT", chantiers: ["Stow Your Bags"], statut: "ACTIF" },
+  { code: "EXT-203541", nom: "GARCIA Luis",     poste: "Sous-traitant", type: "EXT", chantiers: [], statut: "INACTIF" },
+];
+
+let scanning = false;
+let videoStream = null;
+let animFrame = null;
+
+async function startCamera() {
+  const status = document.getElementById('scanStatus');
+  status.textContent = '⏳ Activation de la caméra...';
+  try {
+    videoStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 640 } }
+    });
+    const video = document.getElementById('video');
+    video.srcObject = videoStream;
+    video.play();
+    scanning = true;
+    status.textContent = '🔍 Pointez vers le QR code du salarié';
+    scanLoop();
+  } catch(e) {
+    status.textContent = '❌ Caméra non disponible — utilisez la saisie manuelle ci-dessous';
+  }
+}
+
+function scanLoop() {
+  if (!scanning) return;
+  const video = document.getElementById('video');
+  const canvas = document.getElementById('canvas');
+  if (video.readyState === video.HAVE_ENOUGH_DATA) {
+    canvas.height = video.videoHeight;
+    canvas.width = video.videoWidth;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert" });
+    if (code) {
+      scanning = false;
+      processQR(code.data);
+      return;
+    }
+  }
+  animFrame = requestAnimationFrame(scanLoop);
+}
+
+function processQR(data) {
+  stopCamera();
+  try {
+    const parsed = JSON.parse(data);
+    // QR vient de l'app salarié MAGENCIA
+    const user = USERS.find(u => u.code === (parsed.code || '').toUpperCase());
+    if (user) {
+      showResult(user);
+    } else {
+      showRefus("QR code non reconnu", parsed.code || '?');
+    }
+  } catch(e) {
+    // Peut-être juste un code texte brut
+    const code = data.trim().toUpperCase();
+    const user = USERS.find(u => u.code === code);
+    if (user) showResult(user);
+    else showRefus("Code non reconnu", code);
+  }
+}
+
+function verifyManual() {
+  const code = document.getElementById('manualCode').value.trim().toUpperCase();
+  if (!code) return;
+  const user = USERS.find(u => u.code === code);
+  if (user) showResult(user);
+  else showRefus("Code non reconnu", code);
+}
+
+function showResult(user) {
+  const autorise = user.statut === 'ACTIF' && user.chantiers && user.chantiers.length > 0;
+  const hero = document.getElementById('resultHero');
+
+  if (autorise) {
+    hero.className = 'result-hero autorise';
+    document.getElementById('resultIcon').textContent = '✅';
+    document.getElementById('resultVerdict').textContent = 'AUTORISÉ';
+    document.getElementById('resultSub').textContent = 'Ce salarié est autorisé à passer commande';
+  } else {
+    hero.className = 'result-hero refuse';
+    document.getElementById('resultIcon').textContent = '🚫';
+    document.getElementById('resultVerdict').textContent = 'REFUSÉ';
+    document.getElementById('resultSub').textContent = user.statut === 'INACTIF'
+      ? 'Ce salarié est inactif'
+      : 'Aucun chantier autorisé pour ce salarié';
+  }
+
+  document.getElementById('resNom').textContent = user.nom;
+  document.getElementById('resPoste').textContent = user.poste;
+  document.getElementById('resCode').textContent = user.code;
+  document.getElementById('resBadge').textContent = user.type === 'INTERNE' ? 'Salarié MAGENCIA' : 'Sous-traitant';
+
+  const ch = document.getElementById('resChantiers');
+  if (user.chantiers && user.chantiers.length > 0) {
+    ch.innerHTML = user.chantiers.map(c =>
+      `<div class="chantier-item"><div class="chantier-dot"></div>${c}</div>`
+    ).join('');
+  } else {
+    ch.innerHTML = '<div style="font-size:13px;color:var(--red);">Aucun chantier autorisé</div>';
+  }
+
+  const now = new Date();
+  document.getElementById('resTimestamp').textContent =
+    `Vérifié le ${now.toLocaleDateString('fr-FR')} à ${now.toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit'})}`;
+
+  document.getElementById('screenScan').style.display = 'none';
+  document.getElementById('screenResult').style.display = 'flex';
+  document.getElementById('screenResult').style.flexDirection = 'column';
+}
+
+function showRefus(raison, code) {
+  const hero = document.getElementById('resultHero');
+  hero.className = 'result-hero refuse';
+  document.getElementById('resultIcon').textContent = '❌';
+  document.getElementById('resultVerdict').textContent = 'REFUSÉ';
+  document.getElementById('resultSub').textContent = raison;
+  document.getElementById('resNom').textContent = 'Inconnu';
+  document.getElementById('resPoste').textContent = '—';
+  document.getElementById('resCode').textContent = code;
+  document.getElementById('resBadge').textContent = 'Non référencé';
+  document.getElementById('resChantiers').innerHTML = '<div style="font-size:13px;color:var(--red);">Accès non autorisé</div>';
+  const now = new Date();
+  document.getElementById('resTimestamp').textContent =
+    `Tentative le ${now.toLocaleDateString('fr-FR')} à ${now.toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit'})}`;
+  document.getElementById('screenScan').style.display = 'none';
+  document.getElementById('screenResult').style.display = 'flex';
+  document.getElementById('screenResult').style.flexDirection = 'column';
+}
+
+function stopCamera() {
+  scanning = false;
+  if (animFrame) cancelAnimationFrame(animFrame);
+  if (videoStream) { videoStream.getTracks().forEach(t => t.stop()); videoStream = null; }
+}
+
+function resetScan() {
+  stopCamera();
+  document.getElementById('manualCode').value = '';
+  document.getElementById('scanStatus').textContent = 'Appuyez pour activer la caméra';
+  document.getElementById('screenResult').style.display = 'none';
+  document.getElementById('screenScan').style.display = 'flex';
+  document.getElementById('screenScan').style.flexDirection = 'column';
+}
+</script>
+</body>
+</html>
