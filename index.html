@@ -2,97 +2,120 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>MAGENCIA — Ma carte</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>MAGENCIA</title>
 <style>
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:-apple-system,sans-serif;background:#F5F6FA;min-height:100vh;display:flex;flex-direction:column}
-.header{background:#1B2A4A;padding:16px 20px;display:flex;align-items:center;justify-content:space-between}
-.logo{font-size:18px;font-weight:800;color:white}.logo span{color:#C9A84C}
-#login{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 24px}
-h1{font-size:24px;font-weight:800;color:#1B2A4A;margin-bottom:8px;text-align:center}
-p{font-size:14px;color:#6B7A99;text-align:center;margin-bottom:28px;line-height:1.5}
-.wrap{width:100%;max-width:320px}
-input{width:100%;padding:16px;border:2px solid #E2E8F0;border-radius:12px;font-size:20px;font-weight:700;letter-spacing:3px;text-align:center;text-transform:uppercase;color:#1B2A4A;font-family:monospace;margin-bottom:12px}
-input:focus{outline:none;border-color:#C9A84C}
-button{width:100%;padding:16px;background:#1B2A4A;color:white;border:none;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer}
-.err{background:#FEE2E2;color:#991B1B;border-radius:10px;padding:12px;font-size:13px;text-align:center;margin-top:10px;display:none}
-.codes{margin-top:16px;font-size:12px;color:#6B7A99;text-align:center;line-height:1.8}
-#carte{display:none;flex:1;flex-direction:column;padding:20px}
-.card{background:#1B2A4A;border-radius:20px;padding:24px;color:white;margin-bottom:16px}
-.badge{background:#C9A84C;color:white;font-size:10px;font-weight:800;padding:4px 10px;border-radius:20px;display:inline-block;margin-bottom:16px}
-.name{font-size:26px;font-weight:800;margin-bottom:4px}
-.poste{font-size:14px;opacity:0.65;margin-bottom:4px}
-.code{font-family:monospace;font-size:13px;opacity:0.5}
-.qr{background:white;border-radius:16px;padding:24px;display:flex;flex-direction:column;align-items:center;margin-bottom:16px;box-shadow:0 4px 24px rgba(27,42,74,0.12)}
-.qr-title{font-size:12px;font-weight:700;color:#6B7A99;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:16px}
-.qr img{width:220px;height:220px;border-radius:8px}
-.qr-note{margin-top:14px;font-size:13px;color:#6B7A99;text-align:center}
-.chantiers{background:white;border-radius:16px;padding:20px;margin-bottom:16px;box-shadow:0 4px 24px rgba(27,42,74,0.12)}
-.ch-title{font-size:12px;font-weight:700;color:#6B7A99;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:12px}
-.pill{display:inline-block;background:#EEF2FF;color:#1B2A4A;font-size:13px;font-weight:600;padding:6px 14px;border-radius:20px;margin:3px}
-.btn-out{width:100%;padding:14px;background:transparent;color:#6B7A99;border:1.5px solid #E2E8F0;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer}
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap');
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{--navy:#1B2A4A;--gold:#C9A84C;--bg:#F0F2F7;--white:#fff;--green:#10B981;--red:#EF4444;--muted:#8896B0}
+body{font-family:'Inter',sans-serif;background:var(--bg);min-height:100vh;display:flex;flex-direction:column;max-width:430px;margin:0 auto}
+.safe-top{height:env(safe-area-inset-top,44px);background:var(--navy)}
+.hdr{background:var(--navy);padding:12px 20px 16px;display:flex;align-items:center;justify-content:space-between}
+.logo{font-size:20px;font-weight:900;color:#fff}.logo em{color:var(--gold);font-style:normal}
+.hdr-sub{font-size:11px;color:rgba(255,255,255,0.45);text-transform:uppercase;letter-spacing:0.5px}
+.screen{flex:1;display:flex;flex-direction:column}
+.hidden{display:none!important}
+#sLogin{align-items:center;justify-content:center;padding:32px 24px}
+.login-visual{width:80px;height:80px;background:linear-gradient(135deg,var(--navy),#2d4a8a);border-radius:24px;display:flex;align-items:center;justify-content:center;font-size:36px;margin-bottom:24px;box-shadow:0 8px 32px rgba(27,42,74,0.25)}
+.login-title{font-size:26px;font-weight:800;color:var(--navy);margin-bottom:8px;text-align:center;letter-spacing:-0.5px}
+.login-sub{font-size:15px;color:var(--muted);text-align:center;margin-bottom:36px;line-height:1.5}
+.field{width:100%;max-width:300px;margin-bottom:12px}
+.field-label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;display:block}
+.field-input{width:100%;padding:18px;border:2px solid #DDE3EF;border-radius:14px;font-size:22px;font-weight:700;letter-spacing:4px;text-align:center;text-transform:uppercase;color:var(--navy);font-family:monospace;background:var(--white);-webkit-appearance:none}
+.field-input:focus{outline:none;border-color:var(--gold)}
+.btn-main{width:100%;max-width:300px;padding:18px;background:var(--navy);color:white;border:none;border-radius:14px;font-size:16px;font-weight:700;cursor:pointer}
+.btn-main:active{opacity:0.85}
+.err-msg{max-width:300px;background:#FEE2E2;color:#991B1B;border-radius:12px;padding:12px 16px;font-size:13px;text-align:center;margin-top:10px;display:none;font-weight:500}
+.demo-hint{margin-top:20px;font-size:12px;color:var(--muted);text-align:center;line-height:2}
+.demo-hint strong{color:var(--navy);font-weight:700}
+#sCarte{padding:16px;overflow-y:auto;gap:14px}
+.identity-card{background:linear-gradient(135deg,var(--navy),#243660);border-radius:22px;padding:22px;color:white;position:relative;overflow:hidden}
+.identity-card::before{content:'';position:absolute;right:-20px;top:-20px;width:130px;height:130px;background:rgba(201,168,76,0.15);border-radius:50%}
+.ic-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+.ic-badge{background:var(--gold);color:white;font-size:10px;font-weight:800;padding:5px 12px;border-radius:20px;letter-spacing:0.8px;text-transform:uppercase}
+.ic-status{display:flex;align-items:center;gap:6px;font-size:12px;color:rgba(255,255,255,0.7)}
+.status-dot{width:7px;height:7px;background:#34D399;border-radius:50%}
+.ic-name{font-size:24px;font-weight:800;letter-spacing:-0.5px;margin-bottom:4px}
+.ic-poste{font-size:14px;opacity:0.6;margin-bottom:6px}
+.ic-code{font-family:monospace;font-size:12px;opacity:0.4;letter-spacing:1.5px}
+.qr-card{background:var(--white);border-radius:20px;padding:20px;display:flex;flex-direction:column;align-items:center;box-shadow:0 2px 16px rgba(27,42,74,0.10)}
+.qr-label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:14px}
+.qr-img{width:200px;height:200px;border-radius:12px}
+.qr-note{margin-top:14px;font-size:13px;color:var(--muted);text-align:center;line-height:1.5;font-weight:500}
+.chantiers-card{background:var(--white);border-radius:20px;padding:18px;box-shadow:0 2px 16px rgba(27,42,74,0.10)}
+.ch-label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px}
+.ch-pill{display:inline-flex;align-items:center;gap:6px;background:#EEF2FF;color:var(--navy);font-size:13px;font-weight:600;padding:7px 14px;border-radius:20px;margin:3px}
+.btn-logout{width:100%;padding:15px;background:transparent;color:var(--muted);border:1.5px solid #DDE3EF;border-radius:14px;font-size:14px;font-weight:600;cursor:pointer}
 </style>
 </head>
 <body>
-<div class="header"><div class="logo">MAG<span>ENCIA</span></div><span style="font-size:12px;color:rgba(255,255,255,0.5)">Ma carte accès</span></div>
-<div id="login">
-  <div style="font-size:52px;margin-bottom:16px">🪪</div>
-  <h1>Votre carte d'accès</h1>
-  <p>Connectez-vous avec votre code unique<br>pour afficher votre QR code</p>
-  <div class="wrap">
-    <input id="code" type="text" placeholder="MAG-XXXXXX" maxlength="12" onkeydown="if(event.key==='Enter')go()">
-    <button onclick="go()">Afficher ma carte →</button>
-    <div class="err" id="err">❌ Code non reconnu</div>
-    <div class="codes">Codes : <strong>MAG-384729</strong> · <strong>MAG-582341</strong> · <strong>EXT-114872</strong></div>
-  </div>
+<div class="safe-top"></div>
+<div class="hdr">
+  <div class="logo">MAG<em>ENCIA</em></div>
+  <div class="hdr-sub">Ma carte</div>
 </div>
-<div id="carte">
-  <div class="card">
-    <div class="badge" id="badge">INTERNE</div>
-    <div class="name" id="name">—</div>
-    <div class="poste" id="poste">—</div>
-    <div class="code" id="codeVal">—</div>
+<div class="screen" id="sLogin">
+  <div class="login-visual">🪪</div>
+  <div class="login-title">Carte d'accès</div>
+  <div class="login-sub">Entrez votre code pour afficher<br>votre QR code fournisseur</div>
+  <div class="field">
+    <label class="field-label">Code personnel</label>
+    <input class="field-input" id="codeInput" type="text" placeholder="MAG-XXXXXX" maxlength="12" autocomplete="off" autocorrect="off" spellcheck="false" onkeydown="if(event.key==='Enter')login()">
   </div>
-  <div class="qr">
-    <div class="qr-title">📱 QR Code à scanner chez le fournisseur</div>
-    <img id="qrimg" src="" alt="QR Code">
-    <div class="qr-note">Présentez ce QR code au fournisseur</div>
+  <button class="btn-main" onclick="login()">Afficher ma carte →</button>
+  <div class="err-msg" id="errMsg">❌ Code non reconnu</div>
+  <div class="demo-hint">Codes de test :<br><strong>MAG-384729</strong> · <strong>MAG-582341</strong> · <strong>EXT-114872</strong></div>
+</div>
+<div class="screen hidden" id="sCarte">
+  <div class="identity-card">
+    <div class="ic-top">
+      <div class="ic-badge" id="icBadge">INTERNE</div>
+      <div class="ic-status"><div class="status-dot"></div>ACTIF</div>
+    </div>
+    <div class="ic-name" id="icName">—</div>
+    <div class="ic-poste" id="icPoste">—</div>
+    <div class="ic-code" id="icCode">—</div>
   </div>
-  <div class="chantiers">
-    <div class="ch-title">🏗️ Chantiers autorisés</div>
-    <div id="ch"></div>
+  <div class="qr-card">
+    <div class="qr-label">📱 À scanner chez le fournisseur</div>
+    <img class="qr-img" id="qrImg" src="" alt="QR Code">
+    <div class="qr-note">Le fournisseur scanne ce QR<br>avec son appareil photo iPhone</div>
   </div>
-  <button class="btn-out" onclick="out()">← Déconnexion</button>
+  <div class="chantiers-card">
+    <div class="ch-label">🏗️ Chantiers autorisés</div>
+    <div id="chList"></div>
+  </div>
+  <button class="btn-logout" onclick="logout()">← Déconnexion</button>
 </div>
 <script>
-var U=[
+var USERS=[
   {c:"MAG-384729",n:"EL MRABET Ahmed",p:"Gérant",t:"INTERNE",s:"ACTIF",ch:["NOZ Brioude","Patriarca","Carter Cash Angoulins","Stow Your Bags"]},
   {c:"MAG-582341",n:"DUPONT Vincent",p:"Chef de chantier",t:"INTERNE",s:"ACTIF",ch:["Carter Cash Angoulins","Stow Your Bags"]},
   {c:"EXT-114872",n:"MARTIN Paul",p:"Sous-traitant",t:"EXT",s:"ACTIF",ch:["Stow Your Bags"]},
   {c:"EXT-203541",n:"GARCIA Luis",p:"Sous-traitant",t:"EXT",s:"INACTIF",ch:[]}
 ];
-function go(){
-  var v=document.getElementById("code").value.trim().toUpperCase();
-  var u=U.find(function(x){return x.c===v;});
-  if(!u||u.s==="INACTIF"){document.getElementById("err").style.display="block";return;}
-  document.getElementById("err").style.display="none";
-  document.getElementById("badge").textContent=u.t==="INTERNE"?"INTERNE":"SOUS-TRAITANT";
-  document.getElementById("name").textContent=u.n;
-  document.getElementById("poste").textContent=u.p;
-  document.getElementById("codeVal").textContent=u.c;
-  document.getElementById("ch").innerHTML=u.ch.map(function(c){return'<span class="pill">🏗️ '+c+'</span>';}).join("");
-  var d=encodeURIComponent("MAGENCIA|"+u.c+"|"+u.n+"|"+u.ch.join(","));
-  document.getElementById("qrimg").src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data="+d;
-  document.getElementById("login").style.display="none";
-  document.getElementById("carte").style.display="flex";
-  document.getElementById("carte").style.flexDirection="column";
+var FOURNI_URL="https://ahmed160879.github.io/MAGENCIA-AUTH/fournisseur.html";
+function login(){
+  var v=document.getElementById("codeInput").value.trim().toUpperCase();
+  var u=USERS.find(function(x){return x.c===v;});
+  var err=document.getElementById("errMsg");
+  if(!u||u.s==="INACTIF"){err.style.display="block";return;}
+  err.style.display="none";
+  document.getElementById("icBadge").textContent=u.t==="INTERNE"?"INTERNE":"SOUS-TRAITANT";
+  document.getElementById("icName").textContent=u.n;
+  document.getElementById("icPoste").textContent=u.p;
+  document.getElementById("icCode").textContent=u.c;
+  document.getElementById("chList").innerHTML=u.ch.map(function(c){return'<span class="ch-pill">🏗️ '+c+'</span>';}).join("")||'<span style="color:var(--red);font-size:13px">Aucun chantier autorisé</span>';
+  var url=FOURNI_URL+"?v="+encodeURIComponent(u.c);
+  document.getElementById("qrImg").src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&color=1B2A4A&bgcolor=ffffff&qzone=2&data="+encodeURIComponent(url);
+  document.getElementById("sLogin").classList.add("hidden");
+  document.getElementById("sCarte").classList.remove("hidden");
 }
-function out(){
-  document.getElementById("code").value="";
-  document.getElementById("login").style.display="flex";
-  document.getElementById("login").style.flexDirection="column";
-  document.getElementById("carte").style.display="none";
+function logout(){
+  document.getElementById("codeInput").value="";
+  document.getElementById("sLogin").classList.remove("hidden");
+  document.getElementById("sCarte").classList.add("hidden");
 }
 </script>
 </body>
