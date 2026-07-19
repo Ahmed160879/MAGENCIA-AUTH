@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MAGENCIA — Vérification</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,sans-serif;background:#F5F6FA;min-height:100vh;display:flex;flex-direction:column}
+.header{background:#1B2A4A;padding:16px 20px;display:flex;align-items:center;justify-content:space-between}
+.logo{font-size:18px;font-weight:800;color:white}.logo span{color:#C9A84C}
+.main{flex:1;padding:20px;display:flex;flex-direction:column}
+.hero{border-radius:24px;padding:36px 24px;text-align:center;margin-bottom:20px}
+.hero.ok{background:#ECFDF5;border:3px solid #059669}
+.hero.ko{background:#FEF2F2;border:3px solid #DC2626}
+.icon{font-size:72px;margin-bottom:12px;line-height:1}
+.verdict{font-size:42px;font-weight:900;letter-spacing:-1px;margin-bottom:6px}
+.hero.ok .verdict{color:#059669}
+.hero.ko .verdict{color:#DC2626}
+.sub{font-size:14px;color:#6B7A99}
+.card{background:white;border-radius:16px;padding:20px;box-shadow:0 4px 24px rgba(27,42,74,0.12);margin-bottom:14px}
+.lbl{font-size:11px;font-weight:700;color:#6B7A99;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:8px}
+.nm{font-size:24px;font-weight:800;color:#1B2A4A;margin-bottom:4px}
+.ps{font-size:14px;color:#6B7A99;margin-bottom:4px}
+.cd{font-family:monospace;font-size:12px;color:#6B7A99;letter-spacing:1px}
+.bg{display:inline-block;background:#EEF2FF;color:#1B2A4A;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;margin-top:8px;text-transform:uppercase}
+.ch-item{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #F1F5F9;font-size:14px;font-weight:600;color:#1B2A4A}
+.ch-item:last-child{border-bottom:none}
+.dot{width:8px;height:8px;background:#059669;border-radius:50%;flex-shrink:0}
+.btn{width:100%;padding:15px;background:#1B2A4A;color:white;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:10px}
+.ts{text-align:center;font-size:12px;color:#6B7A99}
+.wait{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:40px 24px}
+.wait h2{font-size:20px;font-weight:800;color:#1B2A4A;margin-bottom:8px}
+.wait p{font-size:14px;color:#6B7A99;margin-bottom:24px}
+.manual-wrap{background:white;border-radius:16px;padding:20px;box-shadow:0 4px 24px rgba(27,42,74,0.12);width:100%;max-width:320px}
+.manual-lbl{font-size:11px;font-weight:700;color:#6B7A99;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:10px}
+.row{display:flex;gap:8px}
+.mi{flex:1;padding:12px;border:2px solid #E2E8F0;border-radius:10px;font-size:16px;font-weight:700;letter-spacing:2px;text-transform:uppercase;font-family:monospace;color:#1B2A4A}
+.mi:focus{outline:none;border-color:#C9A84C}
+.bv{padding:12px 16px;background:#C9A84C;color:white;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer}
+</style>
+</head>
+<body>
+<div class="header"><div class="logo">MAG<span>ENCIA</span></div><span style="font-size:12px;color:rgba(255,255,255,0.5)">Espace fournisseur</span></div>
+
+<div id="screenWait" class="main">
+  <div class="wait">
+    <div style="font-size:52px;margin-bottom:16px">🏪</div>
+    <h2>Vérification salarié</h2>
+    <p>Scannez le QR code du salarié<br>ou saisissez son code manuellement</p>
+    <div class="manual-wrap">
+      <div class="manual-lbl">📝 Saisie manuelle</div>
+      <div class="row">
+        <input class="mi" id="manualCode" type="text" placeholder="MAG-XXXXXX" maxlength="12" onkeydown="if(event.key==='Enter')verify()">
+        <button class="bv" onclick="verify()">OK</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="screenResult" class="main" style="display:none">
+  <div class="hero" id="hero">
+    <div class="icon" id="icon">✅</div>
+    <div class="verdict" id="verdict">AUTORISÉ</div>
+    <div class="sub" id="sub"></div>
+  </div>
+  <div class="card">
+    <div class="lbl">Identité</div>
+    <div class="nm" id="rNom">—</div>
+    <div class="ps" id="rPoste">—</div>
+    <div class="cd" id="rCode">—</div>
+    <div class="bg" id="rBadge">—</div>
+  </div>
+  <div class="card">
+    <div class="lbl">🏗️ Chantiers autorisés</div>
+    <div id="rCh">—</div>
+  </div>
+  <button class="btn" onclick="reset()">← Vérifier un autre salarié</button>
+  <div class="ts" id="rTs"></div>
+</div>
+
+<script>
+var U=[
+  {c:"MAG-384729",n:"EL MRABET Ahmed",p:"Gérant",t:"INTERNE",s:"ACTIF",ch:["NOZ Brioude","Patriarca","Carter Cash Angoulins","Stow Your Bags"]},
+  {c:"MAG-582341",n:"DUPONT Vincent",p:"Chef de chantier",t:"INTERNE",s:"ACTIF",ch:["Carter Cash Angoulins","Stow Your Bags"]},
+  {c:"EXT-114872",n:"MARTIN Paul",p:"Sous-traitant",t:"EXT",s:"ACTIF",ch:["Stow Your Bags"]},
+  {c:"EXT-203541",n:"GARCIA Luis",p:"Sous-traitant",t:"EXT",s:"INACTIF",ch:[]}
+];
+
+// Lecture automatique du code depuis l'URL (quand le fournisseur scanne le QR)
+window.onload=function(){
+  var params=new URLSearchParams(window.location.search);
+  var code=params.get("code");
+  if(code)showResult(code.toUpperCase());
+};
+
+function verify(){
+  var code=document.getElementById("manualCode").value.trim().toUpperCase();
+  if(!code)return;
+  showResult(code);
+}
+
+function showResult(code){
+  var u=null;
+  for(var i=0;i<U.length;i++){if(U[i].c===code){u=U[i];break;}}
+  var ok=u&&u.s==="ACTIF"&&u.ch&&u.ch.length>0;
+  var hero=document.getElementById("hero");
+  hero.className="hero "+(ok?"ok":"ko");
+  document.getElementById("icon").textContent=ok?"✅":"🚫";
+  document.getElementById("verdict").textContent=ok?"AUTORISÉ":"REFUSÉ";
+  document.getElementById("sub").textContent=ok?"Ce salarié est autorisé à passer commande":(!u?"Code non reconnu":u.s==="INACTIF"?"Compte inactif":"Aucun chantier autorisé");
+  document.getElementById("rNom").textContent=u?u.n:"Inconnu";
+  document.getElementById("rPoste").textContent=u?u.p:"—";
+  document.getElementById("rCode").textContent=code;
+  document.getElementById("rBadge").textContent=u?(u.t==="INTERNE"?"Salarié MAGENCIA":"Sous-traitant"):"Non référencé";
+  var ch=document.getElementById("rCh");
+  ch.innerHTML=u&&u.ch&&u.ch.length>0?u.ch.map(function(c){return'<div class="ch-item"><div class="dot"></div>'+c+'</div>';}).join(''):'<div style="font-size:13px;color:#DC2626">Aucun chantier autorisé</div>';
+  var now=new Date();
+  document.getElementById("rTs").textContent="Vérifié le "+now.toLocaleDateString("fr-FR")+" à "+now.toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"});
+  document.getElementById("screenWait").style.display="none";
+  document.getElementById("screenResult").style.display="flex";
+}
+
+function reset(){
+  document.getElementById("manualCode").value="";
+  document.getElementById("screenResult").style.display="none";
+  document.getElementById("screenWait").style.display="flex";
+  history.pushState({},"",location.pathname);
+}
+</script>
+</body>
+</html>

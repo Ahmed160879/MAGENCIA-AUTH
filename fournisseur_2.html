@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>MAGENCIA — Vérification</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{--navy:#1B2A4A;--gold:#C9A84C;--bg:#F0F2F7;--white:#fff;--green:#10B981;--green-bg:#ECFDF5;--red:#EF4444;--red-bg:#FEF2F2;--muted:#8896B0;--card-shadow:0 2px 16px rgba(27,42,74,0.10)}
+html,body{height:100%;overflow:hidden}
+body{font-family:'Inter',sans-serif;background:var(--bg);display:flex;flex-direction:column;max-width:430px;margin:0 auto}
+.safe-top{height:env(safe-area-inset-top,44px);background:var(--navy)}
+.safe-bot{height:env(safe-area-inset-bottom,20px)}
+.hdr{background:var(--navy);padding:12px 20px 16px;display:flex;align-items:center;justify-content:space-between}
+.logo{font-size:20px;font-weight:900;color:#fff;letter-spacing:-0.5px}.logo em{color:var(--gold);font-style:normal}
+.hdr-sub{font-size:11px;color:rgba(255,255,255,0.45);font-weight:500;letter-spacing:0.5px;text-transform:uppercase}
+.screen{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.screen.hidden{display:none}
+
+/* WAIT */
+#sWait{display:flex;flex-direction:column;padding:20px}
+.scan-area{background:var(--white);border-radius:22px;overflow:hidden;margin-bottom:14px;box-shadow:var(--card-shadow)}
+.cam-wrap{position:relative;width:100%;aspect-ratio:1;background:#000;max-height:300px}
+#video{width:100%;height:100%;object-fit:cover;display:block}
+.cam-overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+.cam-frame{width:60%;height:60%;border:3px solid var(--gold);border-radius:16px;box-shadow:0 0 0 9999px rgba(0,0,0,0.5);animation:pulse 2s ease-in-out infinite}
+@keyframes pulse{0%,100%{border-color:var(--gold)}50%{border-color:rgba(201,168,76,0.3)}}
+.cam-line{position:absolute;width:60%;height:2px;background:linear-gradient(90deg,transparent,var(--gold),transparent);animation:scanline 2s ease-in-out infinite}
+@keyframes scanline{0%{top:20%}100%{top:80%}}
+#canvas{display:none}
+.cam-footer{padding:14px 16px;text-align:center}
+.btn-cam{width:100%;padding:14px;background:var(--navy);color:white;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:8px}
+.btn-cam:active{opacity:0.85}
+.cam-status{font-size:13px;color:var(--muted);font-weight:500}
+
+.manual-card{background:var(--white);border-radius:20px;padding:18px;box-shadow:var(--card-shadow)}
+.manual-lbl{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px}
+.manual-row{display:flex;gap:10px}
+.manual-input{flex:1;padding:14px;border:2px solid #DDE3EF;border-radius:12px;font-size:18px;font-weight:700;letter-spacing:3px;text-transform:uppercase;font-family:monospace;color:var(--navy);-webkit-appearance:none}
+.manual-input:focus{outline:none;border-color:var(--gold)}
+.btn-verify{padding:14px 18px;background:var(--gold);color:white;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;white-space:nowrap}
+.btn-verify:active{opacity:0.85}
+
+/* RESULT */
+#sResult{padding:16px;padding-bottom:24px;display:flex;flex-direction:column;gap:14px}
+.result-hero{border-radius:24px;padding:32px 20px;text-align:center}
+.result-hero.ok{background:var(--green-bg);border:3px solid var(--green)}
+.result-hero.ko{background:var(--red-bg);border:3px solid var(--red)}
+.result-icon{font-size:64px;margin-bottom:10px;line-height:1}
+.result-verdict{font-size:38px;font-weight:900;letter-spacing:-1px;margin-bottom:6px}
+.result-hero.ok .result-verdict{color:var(--green)}
+.result-hero.ko .result-verdict{color:var(--red)}
+.result-sub{font-size:14px;color:var(--muted);font-weight:500}
+
+.info-card{background:var(--white);border-radius:20px;padding:18px;box-shadow:var(--card-shadow)}
+.info-lbl{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px}
+.info-name{font-size:22px;font-weight:800;color:var(--navy);margin-bottom:4px;letter-spacing:-0.3px}
+.info-poste{font-size:14px;color:var(--muted);margin-bottom:4px}
+.info-code{font-family:monospace;font-size:12px;color:var(--muted);letter-spacing:1px}
+.info-badge{display:inline-block;background:#EEF2FF;color:var(--navy);font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;margin-top:8px;text-transform:uppercase}
+
+.ch-item{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #F1F5F9;font-size:14px;font-weight:600;color:var(--navy)}
+.ch-item:last-child{border-bottom:none}
+.ch-dot{width:8px;height:8px;background:var(--green);border-radius:50%;flex-shrink:0}
+
+.btn-retry{width:100%;padding:16px;background:var(--navy);color:white;border:none;border-radius:14px;font-size:15px;font-weight:700;cursor:pointer}
+.btn-retry:active{opacity:0.85}
+.result-ts{text-align:center;font-size:12px;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="safe-top"></div>
+<div class="hdr">
+  <div class="logo">MAG<em>ENCIA</em></div>
+  <div class="hdr-sub">Fournisseur</div>
+</div>
+
+<!-- ATTENTE -->
+<div class="screen" id="sWait">
+  <div class="scan-area">
+    <div class="cam-wrap">
+      <video id="video" autoplay playsinline muted></video>
+      <div class="cam-overlay">
+        <div class="cam-frame"></div>
+        <div class="cam-line"></div>
+      </div>
+      <canvas id="canvas"></canvas>
+    </div>
+    <div class="cam-footer">
+      <button class="btn-cam" onclick="startCam()">📷 Activer la caméra</button>
+      <div class="cam-status" id="camStatus">Pointez vers le QR code du salarié</div>
+    </div>
+  </div>
+  <div class="manual-card">
+    <div class="manual-lbl">📝 Ou saisir le code manuellement</div>
+    <div class="manual-row">
+      <input class="manual-input" id="manualCode" type="text" placeholder="MAG-XXXXXX" maxlength="12" autocomplete="off" autocorrect="off" spellcheck="false" onkeydown="if(event.key==='Enter')verifyManual()">
+      <button class="btn-verify" onclick="verifyManual()">OK</button>
+    </div>
+  </div>
+</div>
+
+<!-- RÉSULTAT -->
+<div class="screen hidden" id="sResult">
+  <div class="result-hero" id="rHero">
+    <div class="result-icon" id="rIcon">✅</div>
+    <div class="result-verdict" id="rVerdict">AUTORISÉ</div>
+    <div class="result-sub" id="rSub"></div>
+  </div>
+  <div class="info-card">
+    <div class="info-lbl">Identité</div>
+    <div class="info-name" id="rName">—</div>
+    <div class="info-poste" id="rPoste">—</div>
+    <div class="info-code" id="rCode">—</div>
+    <div class="info-badge" id="rBadge">—</div>
+  </div>
+  <div class="info-card">
+    <div class="info-lbl">🏗️ Chantiers autorisés</div>
+    <div id="rCh">—</div>
+  </div>
+  <button class="btn-retry" onclick="reset()">← Vérifier un autre salarié</button>
+  <div class="result-ts" id="rTs"></div>
+</div>
+
+<div class="safe-bot"></div>
+
+<script>
+var USERS=[
+  {c:"MAG-384729",n:"EL MRABET Ahmed",p:"Gérant",t:"INTERNE",s:"ACTIF",ch:["NOZ Brioude","Patriarca","Carter Cash Angoulins","Stow Your Bags"]},
+  {c:"MAG-582341",n:"DUPONT Vincent",p:"Chef de chantier",t:"INTERNE",s:"ACTIF",ch:["Carter Cash Angoulins","Stow Your Bags"]},
+  {c:"EXT-114872",n:"MARTIN Paul",p:"Sous-traitant",t:"EXT",s:"ACTIF",ch:["Stow Your Bags"]},
+  {c:"EXT-203541",n:"GARCIA Luis",p:"Sous-traitant",t:"EXT",s:"INACTIF",ch:[]}
+];
+
+var scanning=false,stream=null,raf=null;
+
+// Auto-detect code from URL param (when QR is scanned)
+window.onload=function(){
+  var p=new URLSearchParams(window.location.search);
+  var code=p.get("code");
+  if(code)showResult(code.toUpperCase());
+};
+
+async function startCam(){
+  var st=document.getElementById("camStatus");
+  st.textContent="⏳ Activation…";
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment",width:{ideal:640},height:{ideal:640}}});
+    var v=document.getElementById("video");
+    v.srcObject=stream;
+    await v.play();
+    scanning=true;
+    st.textContent="🔍 Pointez vers le QR code";
+    scanLoop();
+  }catch(e){st.textContent="❌ Caméra indisponible — saisie manuelle";}
+}
+
+function scanLoop(){
+  if(!scanning)return;
+  var v=document.getElementById("video"),c=document.getElementById("canvas");
+  if(v.readyState===v.HAVE_ENOUGH_DATA){
+    c.width=v.videoWidth;c.height=v.videoHeight;
+    var ctx=c.getContext("2d");ctx.drawImage(v,0,0);
+    var img=ctx.getImageData(0,0,c.width,c.height);
+    var qr=jsQR(img.data,img.width,img.height,{inversionAttempts:"dontInvert"});
+    if(qr){scanning=false;stopCam();processQR(qr.data);return;}
+  }
+  raf=requestAnimationFrame(scanLoop);
+}
+
+function processQR(data){
+  // QR contient l'URL avec ?code=
+  try{
+    var url=new URL(data);
+    var code=url.searchParams.get("code");
+    if(code){showResult(code.toUpperCase());return;}
+  }catch(e){}
+  // Fallback: QR contient juste le code
+  showResult(data.trim().toUpperCase());
+}
+
+function verifyManual(){
+  var code=document.getElementById("manualCode").value.trim().toUpperCase();
+  if(!code)return;
+  showResult(code);
+}
+
+function showResult(code){
+  var u=USERS.find(function(x){return x.c===code;});
+  var ok=u&&u.s==="ACTIF"&&u.ch&&u.ch.length>0;
+  var hero=document.getElementById("rHero");
+  hero.className="result-hero "+(ok?"ok":"ko");
+  document.getElementById("rIcon").textContent=ok?"✅":"🚫";
+  document.getElementById("rVerdict").textContent=ok?"AUTORISÉ":"REFUSÉ";
+  document.getElementById("rSub").textContent=ok?"Ce salarié est autorisé à passer commande":(!u?"Code non reconnu dans le système":u.s==="INACTIF"?"Compte inactif — contacter MAGENCIA":"Aucun chantier autorisé");
+  document.getElementById("rName").textContent=u?u.n:"Inconnu";
+  document.getElementById("rPoste").textContent=u?u.p:"—";
+  document.getElementById("rCode").textContent=code;
+  document.getElementById("rBadge").textContent=u?(u.t==="INTERNE"?"Salarié MAGENCIA":"Sous-traitant"):"Non référencé";
+  var ch=document.getElementById("rCh");
+  ch.innerHTML=u&&u.ch&&u.ch.length>0
+    ?u.ch.map(function(c){return'<div class="ch-item"><div class="ch-dot"></div>'+c+'</div>';}).join('')
+    :'<div style="font-size:13px;color:var(--red)">Aucun chantier autorisé</div>';
+  var now=new Date();
+  document.getElementById("rTs").textContent="Vérifié le "+now.toLocaleDateString("fr-FR")+" à "+now.toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"});
+  document.getElementById("sWait").classList.add("hidden");
+  document.getElementById("sResult").classList.remove("hidden");
+}
+
+function stopCam(){
+  scanning=false;
+  if(raf)cancelAnimationFrame(raf);
+  if(stream)stream.getTracks().forEach(function(t){t.stop();});
+}
+
+function reset(){
+  stopCam();
+  document.getElementById("manualCode").value="";
+  document.getElementById("camStatus").textContent="Pointez vers le QR code du salarié";
+  document.getElementById("sResult").classList.add("hidden");
+  document.getElementById("sWait").classList.remove("hidden");
+  history.pushState({},"",location.pathname);
+}
+</script>
+</body>
+</html>
