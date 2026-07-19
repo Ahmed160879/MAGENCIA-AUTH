@@ -409,9 +409,10 @@ function renderAll() {
         '<td>'+
           '<button class="btn-tbl" onclick="editSalarie(\''+s.code+'\')">✏️</button>'+
           '<button class="btn-tbl danger" onclick="toggleStatut(\''+s.code+'\',\''+s.statut+'\')">'+
-            (s.statut==="ACTIF"?"🔴 Désactiver":"🟢 Activer")+
+            (s.statut==="ACTIF"?"'🔴 Désactiver':'🟢 Activer')+
           '</button>'+
-          '<button class="btn-tbl danger" onclick="deleteSalarie(\''+s.code+'\')" title="Supprimer définitivement">🗑️</button>'+
+          '<button class="btn-tbl danger" onclick="deleteSalarie(\''+s.code+'\')" title="Supprimer">🗑️</button>'+
+        '</td>'+          '<button class="btn-tbl danger" onclick="deleteSalarie(\''+s.code+'\')" title="Supprimer définitivement">🗑️</button>'+
         '</td>'+
       '</tr>';
     }).join("");
