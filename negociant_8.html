@@ -140,17 +140,6 @@ body{font-family:'Inter',sans-serif;background:var(--bg);display:flex;flex-direc
   <div class="brand-mark">🏪</div>
   <div class="login-h">Espace Négociant</div>
   <div class="login-p" id="loginSubtitle">Connectez-vous pour scanner les QR codes des salariés</div>
-  <div class="field" id="negoSelectField">
-    <label class="field-lbl">Enseigne / Agence</label>
-    <select class="field-in" id="loginNego">
-      <option value="">-- Sélectionner votre agence --</option>
-      <option value="POINT P Bordeaux">POINT P — Bordeaux</option>
-      <option value="POINT P Merignac">POINT P — Mérignac</option>
-      <option value="BIGMAT Castres-Gironde">BIGMAT — Castres-Gironde</option>
-      <option value="CEDEO Merignac">CEDEO — Mérignac</option>
-      <option value="SOCODA Langon">SOCODA — Langon</option>
-    </select>
-  </div>
   <div class="field">
     <label class="field-lbl">Code d'accès agence</label>
     <input class="field-in" id="loginPwd" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')loginNego()">
@@ -280,6 +269,7 @@ var currentNego = null;
 var urlParams = new URLSearchParams(window.location.search);
 var negoFromUrl = urlParams.get("nego") ? decodeURIComponent(urlParams.get("nego")) : null;
 var currentPassageCode = null;
+var currentPassageId = null;
 var scanning = false, stream = null, raf = null;
 
 var DEMO = {
@@ -292,9 +282,8 @@ var DEMO = {
 var companyNames = {"MAG":"MAGENCIA","EXT":"Sous-traitant","ATL":"ATLAS","MAR":"BTP Martin SAS"};
 
 window.onload = function() {
-  // Si l'agence est dans l'URL, cacher le menu déroulant
+  // Afficher le nom de l'agence lue dans l'URL
   if (negoFromUrl) {
-    document.getElementById("negoSelectField").style.display = "none";
     document.getElementById("loginSubtitle").textContent = "Agence : " + negoFromUrl;
     document.getElementById("loginSubtitle").style.fontWeight = "700";
     document.getElementById("loginSubtitle").style.color = "#0F1F3D";
@@ -341,10 +330,10 @@ setInterval(function(){
 }, 1000);
 
 function loginNego() {
-  var nego = negoFromUrl || document.getElementById("loginNego").value;
+  var nego = negoFromUrl;
   var pwd = document.getElementById("loginPwd").value;
   var err = document.getElementById("loginErr");
-  if (!nego) { err.textContent = "❌ Veuillez sélectionner votre agence"; err.style.display = "block"; return; }
+  if (!nego) { err.textContent = "❌ Agence manquante dans le lien (paramètre ?nego=...)"; err.style.display = "block"; return; }
   if (pwd !== NEGO_PWD) { err.textContent = "❌ Code incorrect"; err.style.display = "block"; return; }
   err.style.display = "none";
   currentNego = nego;
@@ -374,13 +363,20 @@ async function fetchSalarie(code) {
 }
 
 async function logPassage(code, user, ok) {
+  currentPassageId = null;
   try {
-    await fetch(SUPABASE_URL + "/rest/v1/passages", {
+    var res = await fetch(SUPABASE_URL + "/rest/v1/passages", {
       method: "POST",
-      headers: {"apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", "Prefer": "return=minimal"},
+      headers: {"apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", "Prefer": "return=representation"},
       body: JSON.stringify({code_salarie: code, nom_salarie: user ? user.nom : "INCONNU", agence: currentNego, resultat: ok ? "AUTORISE" : "REFUSE", chantiers: user ? user.chantiers : []})
     });
-  } catch(e) {}
+    if (res.ok) {
+      var data = await res.json();
+      if (Array.isArray(data) && data[0] && data[0].id) currentPassageId = data[0].id;
+    } else {
+      console.error("logPassage insert failed", res.status, await res.text());
+    }
+  } catch(e) { console.error("logPassage error", e); }
 }
 
 async function showResult(code) {
@@ -435,17 +431,30 @@ async function saveBL() {
   var body = {};
   if (bl) body.bon_livraison = bl;
   if (chantier) body.chantier = chantier;
+  var saved = false;
   try {
-    await fetch(SUPABASE_URL + "/rest/v1/passages?code_salarie=eq." + encodeURIComponent(currentPassageCode) + "&agence=eq." + encodeURIComponent(currentNego) + "&order=created_at.desc&limit=1", {
-      method: "PATCH",
-      headers: {"apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", "Prefer": "return=minimal"},
-      body: JSON.stringify(body)
-    });
-  } catch(e) {}
+    if (currentPassageId) {
+      var res = await fetch(SUPABASE_URL + "/rest/v1/passages?id=eq." + encodeURIComponent(currentPassageId), {
+        method: "PATCH",
+        headers: {"apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", "Prefer": "return=minimal"},
+        body: JSON.stringify(body)
+      });
+      saved = res.ok;
+      if (!res.ok) console.error("saveBL patch failed", res.status, await res.text());
+    } else {
+      var res2 = await fetch(SUPABASE_URL + "/rest/v1/passages?code_salarie=eq." + encodeURIComponent(currentPassageCode) + "&agence=eq." + encodeURIComponent(currentNego) + "&order=created_at.desc&limit=1", {
+        method: "PATCH",
+        headers: {"apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", "Prefer": "return=minimal"},
+        body: JSON.stringify(body)
+      });
+      saved = res2.ok;
+      if (!res2.ok) console.error("saveBL fallback patch failed", res2.status, await res2.text());
+    }
+  } catch(e) { console.error("saveBL error", e); }
   var msg = [];
   if (bl) msg.push("BL " + bl);
   if (chantier) msg.push("Chantier : " + chantier);
-  document.getElementById("blSavedTxt").textContent = msg.join(" · ") + " enregistré ✓";
+  document.getElementById("blSavedTxt").textContent = (saved ? "" : "⚠️ ") + msg.join(" · ") + (saved ? " enregistré ✓" : " — échec enregistrement");
   document.getElementById("blSaved").style.display = "flex";
   document.getElementById("blInput").value = "";
   document.getElementById("chantierInput").value = "";
@@ -544,7 +553,6 @@ function resetScan() {
 function logout() {
   stopCam();
   currentNego = null;
-  document.getElementById("loginNego").value = "";
   document.getElementById("loginPwd").value = "";
   document.getElementById("tabBar").classList.add("hidden");
   document.getElementById("sScan").classList.add("hidden");
