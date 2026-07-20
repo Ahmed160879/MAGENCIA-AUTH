@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AccèsPro — Admin</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--navy:#0F1F3D;--gold:#D4A843;--bg:#F2F4F8;--white:#fff;--green:#0CAF60;--red:#E53935;--muted:#7B8BAD;--border:#E4E8F0;--shadow:0 2px 16px rgba(15,31,61,0.08)}
+body{font-family:'Inter',sans-serif;background:var(--bg);min-height:100vh}
+
+/* HEADER */
+.hdr{background:var(--navy);padding:14px 28px;display:flex;align-items:center;justify-content:space-between}
+.logo{font-size:18px;font-weight:900;color:#fff}.logo em{color:var(--gold);font-style:normal}
+.hdr-right{display:flex;align-items:center;gap:12px}
+.hdr-tag{background:rgba(212,168,67,0.15);border:1px solid rgba(212,168,67,0.3);color:var(--gold);font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px}
+.btn-logout-hdr{background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);border:none;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer}
+
+/* LOGIN ADMIN */
+#screenLogin{display:flex;align-items:center;justify-content:center;min-height:calc(100vh - 56px);padding:24px}
+.login-card{background:var(--white);border-radius:20px;padding:32px;width:100%;max-width:360px;box-shadow:var(--shadow);text-align:center}
+.login-icon{font-size:40px;margin-bottom:16px}
+.login-h{font-size:22px;font-weight:800;color:var(--navy);margin-bottom:6px}
+.login-p{font-size:13px;color:var(--muted);margin-bottom:24px}
+.form-group{margin-bottom:14px;text-align:left}
+.form-lbl{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:6px;display:block}
+.form-in{width:100%;padding:12px 14px;border:2px solid var(--border);border-radius:10px;font-size:14px;color:var(--navy)}
+.form-in:focus{outline:none;border-color:var(--gold)}
+.btn-login{width:100%;padding:14px;background:var(--navy);color:white;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;margin-top:8px}
+.login-err{background:#FEE;color:#C62828;border-radius:8px;padding:10px;font-size:13px;margin-top:10px;display:none}
+
+/* DASHBOARD */
+#screenDash{display:none;padding:24px 28px;max-width:1200px;margin:0 auto}
+
+/* TABS ENTREPRISES */
+.company-bar{display:flex;align-items:center;gap:10px;margin-bottom:24px;flex-wrap:wrap}
+.company-tab{padding:8px 18px;border-radius:20px;font-size:13px;font-weight:700;cursor:pointer;border:2px solid var(--border);background:var(--white);color:var(--muted);transition:all 0.2s}
+.company-tab.active{background:var(--navy);color:white;border-color:var(--navy)}
+.btn-add-company{padding:8px 16px;border-radius:20px;font-size:13px;font-weight:700;cursor:pointer;border:2px dashed var(--border);background:transparent;color:var(--muted)}
+.btn-add-company:hover{border-color:var(--gold);color:var(--gold)}
+
+/* KPIs */
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px}
+.kpi{background:var(--white);border-radius:16px;padding:18px;box-shadow:var(--shadow)}
+.kpi-icon{font-size:24px;margin-bottom:8px}
+.kpi-val{font-size:28px;font-weight:900;color:var(--navy);margin-bottom:2px}
+.kpi-lbl{font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.8px}
+
+/* SECTIONS */
+.section{background:var(--white);border-radius:16px;padding:20px;box-shadow:var(--shadow);margin-bottom:20px}
+.section-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.section-title{font-size:15px;font-weight:800;color:var(--navy)}
+.section-actions{display:flex;gap:8px}
+.btn-action{padding:7px 14px;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer}
+.btn-primary{background:var(--navy);color:white}
+.btn-gold{background:var(--gold);color:var(--navy)}
+.btn-outline{background:transparent;border:1.5px solid var(--border);color:var(--navy)}
+
+table{width:100%;border-collapse:collapse}
+th{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;padding:8px 12px;text-align:left;border-bottom:1.5px solid var(--border)}
+td{font-size:13px;color:#374151;padding:10px 12px;border-bottom:1px solid var(--border)}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:#FAFBFF}
+.pill{display:inline-block;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;text-transform:uppercase}
+.pill-green{background:#EDFBF3;color:var(--green)}
+.pill-red{background:#FFF0F0;color:var(--red)}
+.pill-blue{background:#EEF2FF;color:var(--navy)}
+.pill-gold{background:#FFF8EC;color:#B45309}
+.btn-tbl{padding:4px 10px;border:1.5px solid var(--border);background:transparent;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;color:var(--navy);margin-right:4px}
+.btn-tbl.danger{border-color:#FFCDD2;color:var(--red)}
+
+/* MODAL */
+.modal-bg{position:fixed;inset:0;background:rgba(15,31,61,0.5);display:none;align-items:center;justify-content:center;z-index:100;padding:20px}
+.modal-bg.open{display:flex}
+.modal{background:var(--white);border-radius:20px;padding:28px;width:100%;max-width:440px;box-shadow:0 20px 60px rgba(15,31,61,0.2);max-height:90vh;overflow-y:auto}
+.modal-title{font-size:18px;font-weight:800;color:var(--navy);margin-bottom:20px}
+.modal-actions{display:flex;gap:10px;margin-top:20px}
+.btn-cancel{flex:1;padding:12px;background:transparent;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;color:var(--muted)}
+.btn-save{flex:2;padding:12px;background:var(--navy);color:white;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer}
+
+.qr-preview{text-align:center;margin-top:16px;padding:16px;background:var(--bg);border-radius:12px}
+.qr-preview img{width:150px;height:150px;border-radius:8px}
+.qr-preview p{font-size:12px;color:var(--muted);margin-top:8px}
+
+@media(max-width:768px){
+  .kpi-grid{grid-template-columns:repeat(2,1fr)}
+  #screenDash{padding:16px}
+  .hdr{padding:12px 16px}
+  table{font-size:12px}
+  th,td{padding:8px}
+}
+</style>
+</head>
+<body>
+<div class="hdr">
+  <div class="logo">Accès<em>Pro</em></div>
+  <div class="hdr-right">
+    <div class="hdr-tag" id="hdrCompany">Super Admin</div>
+    <button class="btn-logout-hdr" onclick="logout()">Déconnexion</button>
+  </div>
+</div>
+
+<!-- LOGIN -->
+<div id="screenLogin">
+  <div class="login-card">
+    <div class="login-icon">🔐</div>
+    <div class="login-h">Espace Admin</div>
+    <div class="login-p">Connectez-vous pour gérer vos entreprises et salariés</div>
+    <div class="form-group">
+      <label class="form-lbl">Email</label>
+      <input class="form-in" id="loginEmail" type="email" placeholder="admin@acces-pro.fr">
+    </div>
+    <div class="form-group">
+      <label class="form-lbl">Mot de passe</label>
+      <input class="form-in" id="loginPwd" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')login()">
+    </div>
+    <button class="btn-login" onclick="login()">Accéder au dashboard →</button>
+    <div class="login-err" id="loginErr">❌ Identifiants incorrects</div>
+    <div style="margin-top:16px;font-size:12px;color:var(--muted)">Demo : admin@magencia.fr / magencia2026</div>
+  </div>
+</div>
+
+<!-- DASHBOARD -->
+<div id="screenDash">
+  <!-- SÉLECTEUR ENTREPRISES -->
+  <div style="margin-bottom:20px;margin-top:4px">
+    <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">Entreprises</div>
+    <div class="company-bar" id="companyBar">
+      <button class="btn-add-company" onclick="openAddCompany()">+ Nouvelle entreprise</button>
+    </div>
+  </div>
+
+  <!-- KPIs -->
+  <div class="kpi-grid">
+    <div class="kpi"><div class="kpi-icon">👤</div><div class="kpi-val" id="kpiSal">—</div><div class="kpi-lbl">Salariés actifs</div></div>
+    <div class="kpi"><div class="kpi-icon">📊</div><div class="kpi-val" id="kpiPass">—</div><div class="kpi-lbl">Passages total</div></div>
+    <div class="kpi"><div class="kpi-icon">✅</div><div class="kpi-val" id="kpiOk" style="color:var(--green)">—</div><div class="kpi-lbl">Autorisés</div></div>
+    <div class="kpi"><div class="kpi-icon">🚫</div><div class="kpi-val" id="kpiKo" style="color:var(--red)">—</div><div class="kpi-lbl">Refusés</div></div>
+  </div>
+
+  <!-- SALARIÉS -->
+  <div class="section">
+    <div class="section-hdr">
+      <div class="section-title">👤 Salariés — <span id="currentCompanyName" style="color:var(--gold)">—</span></div>
+      <div class="section-actions">
+        <button class="btn-action btn-gold" onclick="openAddSalarie()">+ Ajouter</button>
+        <button class="btn-action btn-outline" onclick="exportCSV('salaries')">⬇️ Export</button>
+      </div>
+    </div>
+    <table>
+      <thead><tr><th>Code</th><th>Nom</th><th>Poste</th><th>Type</th><th>Statut</th><th>Chantiers</th><th>QR</th><th>Actions</th></tr></thead>
+      <tbody id="salariesBody"><tr><td colspan="8" style="text-align:center;color:var(--muted);padding:24px">⏳ Chargement...</td></tr></tbody>
+    </table>
+  </div>
+
+  <!-- HISTORIQUE -->
+  <div class="section">
+    <div class="section-hdr">
+      <div class="section-title">📋 Historique des passages</div>
+      <div class="section-actions">
+        <button class="btn-action btn-outline" onclick="exportCSV('passages')">⬇️ Export CSV</button>
+      </div>
+    </div>
+    <table>
+      <thead><tr><th>Date / Heure</th><th>Code</th><th>Salarié</th><th>Agence</th><th>Chantier</th><th>Bon de livraison</th><th>Résultat</th></tr></thead>
+      <tbody id="passagesBody"><tr><td colspan="7" style="text-align:center;color:var(--muted);padding:24px">⏳ Chargement...</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- MODAL SALARIÉ -->
+<div class="modal-bg" id="modalSalarie">
+  <div class="modal">
+    <div class="modal-title" id="modalSalTitle">Ajouter un salarié</div>
+    <input type="hidden" id="salEditId">
+    <div class="form-group">
+      <label class="form-lbl">Code unique</label>
+      <input class="form-in" id="salCode" type="text" placeholder="MAG-XXXXXX" style="font-family:monospace;letter-spacing:2px;text-transform:uppercase">
+    </div>
+    <div class="form-group">
+      <label class="form-lbl">Nom complet</label>
+      <input class="form-in" id="salNom" type="text" placeholder="DUPONT Vincent">
+    </div>
+    <div class="form-group">
+      <label class="form-lbl">Poste</label>
+      <input class="form-in" id="salPoste" type="text" placeholder="Chef de chantier">
+    </div>
+    <div class="form-group">
+      <label class="form-lbl">Type</label>
+      <select class="form-in" id="salType">
+        <option value="INTERNE">INTERNE</option>
+        <option value="EXT">SOUS-TRAITANT</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-lbl">Statut</label>
+      <select class="form-in" id="salStatut">
+        <option value="ACTIF">ACTIF</option>
+        <option value="INACTIF">INACTIF</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-lbl">Chantiers autorisés (séparés par virgule)</label>
+      <input class="form-in" id="salChantiers" type="text" placeholder="NOZ Brioude, Patriarca, Carter Cash">
+    </div>
+    <div class="qr-preview" id="qrPreview" style="display:none">
+      <img id="qrPreviewImg" src="" alt="QR">
+      <p>QR Code du salarié</p>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal('modalSalarie')">Annuler</button>
+      <button class="btn-save" onclick="saveSalarie()">💾 Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL ENTREPRISE -->
+<div class="modal-bg" id="modalCompany">
+  <div class="modal">
+    <div class="modal-title">Ajouter une entreprise</div>
+    <div class="form-group">
+      <label class="form-lbl">Nom de l'entreprise</label>
+      <input class="form-in" id="companyNom" type="text" placeholder="ex: BTP Martin SAS">
+    </div>
+    <div class="form-group">
+      <label class="form-lbl">Préfixe des codes salariés</label>
+      <input class="form-in" id="companyPrefix" type="text" placeholder="ex: MAR" style="text-transform:uppercase;letter-spacing:2px;font-family:monospace" maxlength="4">
+    </div>
+    <div class="form-group">
+      <label class="form-lbl">Email admin</label>
+      <input class="form-in" id="companyEmail" type="email" placeholder="admin@entreprise.fr">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal('modalCompany')">Annuler</button>
+      <button class="btn-save" onclick="saveCompany()">💾 Créer l'entreprise</button>
+    </div>
+  </div>
+</div>
+
+<script>
+var SUPABASE_URL = "https://rzveghiwbjafmfhrfscb.supabase.co";
+var SUPABASE_KEY = "sb_publishable_Hb6ILSc7bzW_sC6ZD2X7Nw_QP5homkU";
+var FOURNI_URL = "https://ahmed160879.github.io/MAGENCIA-AUTH/fournisseur-supabase.html";
+
+// Entreprises chargées depuis Supabase
+var COMPANIES = [];
+var currentCompany = null;
+var salaries = [];
+var passages = [];
+
+// ── AUTH ──
+var ADMINS = {
+  "admin@magencia.fr": {pwd:"magencia2026", company:"magencia", nom:"Ahmed EL MRABET"},
+  "superadmin@acces-pro.fr": {pwd:"acces2026", company:"all", nom:"Super Admin"}
+};
+
+async function login() {
+  var email = document.getElementById("loginEmail").value.trim().toLowerCase();
+  var pwd = document.getElementById("loginPwd").value;
+  var admin = ADMINS[email];
+  if (!admin || admin.pwd !== pwd) {
+    document.getElementById("loginErr").style.display = "block";
+    return;
+  }
+  document.getElementById("loginErr").style.display = "none";
+  currentUser = admin;
+  // Charger les entreprises depuis Supabase
+  await loadCompanies();
+  document.getElementById("screenLogin").style.display = "none";
+  document.getElementById("screenDash").style.display = "block";
+  renderCompanyBar();
+  if (admin.company === "all") {
+    if (COMPANIES.length > 0) selectCompany(COMPANIES[0]);
+  } else {
+    var comp = COMPANIES.find(function(c){return c.id === admin.company;});
+    selectCompany(comp || COMPANIES[0]);
+  }
+}
+
+async function loadCompanies() {
+  try {
+    var res = await fetch(SUPABASE_URL + "/rest/v1/entreprises?select=*&order=nom", {
+      headers: {"apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY}
+    });
+    var data = await res.json();
+    if (Array.isArray(data) && data.length > 0) {
+      COMPANIES = data;
+      return;
+    }
+  } catch(e) {}
+  // Fallback
+  COMPANIES = [
+    {id:"magencia", nom:"MAGENCIA", prefix:"MAG", email_admin:"ahmed@magencia.fr"},
+  ];
+}
+
+function logout() {
+  document.getElementById("screenLogin").style.display = "flex";
+  document.getElementById("screenDash").style.display = "none";
+}
+
+// ── ENTREPRISES ──
+function renderCompanyBar() {
+  var bar = document.getElementById("companyBar");
+  var html = "";
+  var showAll = currentUser && currentUser.company === "all";
+  var filtered = showAll ? COMPANIES : COMPANIES.filter(function(c){return c.id === currentUser.company;});
+  filtered.forEach(function(c) {
+    html += '<div style="display:inline-flex;align-items:center;gap:4px;margin:2px">';
+    html += '<button class="company-tab" onclick="selectCompany('+JSON.stringify(c).replace(/"/g,'&quot;')+')" id="tab-'+c.id+'">'+c.nom+'</button>';
+    if (showAll && c.id !== "magencia") {
+      html += '<button onclick="deleteCompany(\''+c.id+'\',\''+c.nom+'\')" style="background:transparent;border:none;cursor:pointer;font-size:13px;color:#E53935;padding:2px 4px" title="Supprimer">🗑️</button>';
+    }
+    html += '</div>';
+  });
+  if (showAll) html += '<button class="btn-add-company" onclick="openAddCompany()">+ Nouvelle entreprise</button>';
+  bar.innerHTML = html;
+}
+
+function selectCompany(company) {
+  currentCompany = company;
+  document.getElementById("hdrCompany").textContent = company.nom;
+  document.getElementById("currentCompanyName").textContent = company.nom;
+  document.querySelectorAll(".company-tab").forEach(function(t){t.classList.remove("active");});
+  var tab = document.getElementById("tab-"+company.id);
+  if (tab) tab.classList.add("active");
+  loadData();
+}
+
+function openAddCompany() {
+  document.getElementById("companyNom").value = "";
+  document.getElementById("companyPrefix").value = "";
+  document.getElementById("companyEmail").value = "";
+  document.getElementById("modalCompany").classList.add("open");
+}
+
+async function saveCompany() {
+  var nom = document.getElementById("companyNom").value.trim();
+  var prefix = document.getElementById("companyPrefix").value.trim().toUpperCase();
+  var email = document.getElementById("companyEmail").value.trim();
+  if (!nom || !prefix) return;
+  var id = nom.toLowerCase().replace(/\s+/g,"-").replace(/[^a-z0-9-]/g,"");
+  var pwd = prefix.toLowerCase()+"2026";
+  // Enregistrer dans Supabase
+  try {
+    await fetch(SUPABASE_URL + "/rest/v1/entreprises", {
+      method: "POST",
+      headers: {"apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", "Prefer": "return=minimal"},
+      body: JSON.stringify({id:id, nom:nom, prefix:prefix, email_admin:email})
+    });
+  } catch(e) {}
+  // Mettre à jour en mémoire
+  COMPANIES.push({id:id, nom:nom, prefix:prefix, email_admin:email});
+  ADMINS[email] = {pwd:pwd, company:id, nom:"Admin "+nom};
+  closeModal("modalCompany");
+  renderCompanyBar();
+  selectCompany(COMPANIES[COMPANIES.length-1]);
+  alert("✅ Entreprise créée et enregistrée !\n\nLogin: "+email+"\nMot de passe: "+pwd+"\n\nPartagez ces identifiants à l'entreprise cliente.");
+}
+
+// ── DONNÉES ──
+async function loadData() {
+  if (!currentCompany) return;
+  try {
+    var prefix = currentCompany.prefix;
+    // Salariés de cette entreprise (filtre par préfixe du code)
+    var res = await fetch(SUPABASE_URL + "/rest/v1/salaries?code=like."+prefix+"-*&select=*&order=nom", {
+      headers: {"apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY}
+    });
+    salaries = await res.json();
+    if (!Array.isArray(salaries)) salaries = [];
+  } catch(e) {
+    salaries = [
+      {code:"MAG-384729",nom:"EL MRABET Ahmed",poste:"Gérant",type:"INTERNE",statut:"ACTIF",chantiers:["NOZ Brioude","Patriarca","Carter Cash","Stow Your Bags"]},
+      {code:"MAG-582341",nom:"DUPONT Vincent",poste:"Chef de chantier",type:"INTERNE",statut:"ACTIF",chantiers:["Carter Cash","Stow Your Bags"]},
+      {code:"EXT-114872",nom:"MARTIN Paul",poste:"Sous-traitant",type:"EXT",statut:"ACTIF",chantiers:["Stow Your Bags"]},
+    ];
+  }
+  try {
+    // Filtrer les passages par entreprise
+    var passageFilter = "code_salarie=like." + currentCompany.prefix + "-*";
+    // Pour MAGENCIA, inclure aussi les EXT- (sous-traitants)
+    if (currentCompany.prefix === "MAG") {
+      passageFilter = "or=(code_salarie.like.MAG-*,code_salarie.like.EXT-*)";
+    }
+    // Pour super admin sur "all" — filtrer quand même par l'entreprise sélectionnée
+    if (currentUser && currentUser.company === "all" && currentCompany) {
+      if (currentCompany.prefix === "MAG") {
+        passageFilter = "or=(code_salarie.like.MAG-*,code_salarie.like.EXT-*)";
+      } else {
+        passageFilter = "code_salarie=like." + currentCompany.prefix + "-*";
+      }
+    }
+    var res2 = await fetch(SUPABASE_URL + "/rest/v1/passages?" + passageFilter + "&order=created_at.desc&limit=50&select=*", {
+      headers: {"apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY}
+    });
+    passages = await res2.json();
+    if (!Array.isArray(passages)) passages = [];
+  } catch(e) { passages = []; }
+  renderAll();
+}
+
+function renderAll() {
+  var actifs = salaries.filter(function(s){return s.statut==="ACTIF";}).length;
+  var ok = passages.filter(function(p){return p.resultat==="AUTORISE";}).length;
+  var ko = passages.filter(function(p){return p.resultat==="REFUSE";}).length;
+  document.getElementById("kpiSal").textContent = actifs;
+  document.getElementById("kpiPass").textContent = passages.length;
+  document.getElementById("kpiOk").textContent = ok;
+  document.getElementById("kpiKo").textContent = ko;
+
+  // Table salariés
+  var sb = document.getElementById("salariesBody");
+  if (salaries.length === 0) {
+    sb.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:24px">Aucun salarié — cliquez sur "+ Ajouter"</td></tr>';
+  } else {
+    sb.innerHTML = salaries.map(function(s) {
+      var ch = Array.isArray(s.chantiers) ? s.chantiers : [];
+      return '<tr>'+
+        '<td><code style="font-size:11px;font-weight:700;color:var(--navy)">'+s.code+'</code></td>'+
+        '<td><strong>'+s.nom+'</strong></td>'+
+        '<td>'+s.poste+'</td>'+
+        '<td><span class="pill '+(s.type==="INTERNE"?"pill-blue":"pill-gold")+'">'+s.type+'</span></td>'+
+        '<td><span class="pill '+(s.statut==="ACTIF"?"pill-green":"pill-red")+'">'+s.statut+'</span></td>'+
+        '<td style="font-size:12px">'+ch.join(", ")+'</td>'+
+        '<td><button class="btn-tbl" onclick="showQR(\''+s.code+'\')">📱 QR</button></td>'+
+        '<td>'+
+          '<button class="btn-tbl" onclick="editSalarie(\''+s.code+'\')">✏️</button>'+
+          '<button class="btn-tbl danger" onclick="toggleStatut(\''+s.code+'\',\''+s.statut+'\')">'+
+            (s.statut==="ACTIF"?"🔴 Désactiver":"🟢 Activer")+
+          '</button>'+
+          '<button class="btn-tbl danger" onclick="deleteSalarie(\''+s.code+'\')" title="Supprimer définitivement">🗑️</button>'+
+        '</td>'+
+      '</tr>';
+    }).join("");
+  }
+
+  // Table passages
+  var pb = document.getElementById("passagesBody");
+  if (passages.length === 0) {
+    pb.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:24px">Aucun passage enregistré</td></tr>';
+  } else {
+    pb.innerHTML = passages.map(function(p) {
+      var d = p.created_at ? new Date(p.created_at).toLocaleString("fr-FR") : "—";
+      return '<tr>'+
+        '<td style="font-size:12px">'+d+'</td>'+
+        '<td><code style="font-size:11px;font-weight:700">'+p.code_salarie+'</code></td>'+
+        '<td>'+p.nom_salarie+'</td>'+
+        '<td>'+p.agence+'</td>'+
+        '<td>'+(p.chantier?'<span style="font-size:12px;font-weight:600;color:var(--navy)">🏗️ '+p.chantier+'</span>':'<span style="color:var(--muted);font-size:11px">—</span>')+'</td>'+
+        '<td>'+(p.bon_livraison?'<span style="font-family:monospace;font-size:11px;font-weight:700;background:#FFF8EC;color:#B45309;padding:3px 8px;border-radius:6px">'+p.bon_livraison+'</span>':'<span style="color:var(--muted);font-size:11px">—</span>')+'</td>'+
+        '<td><span class="pill '+(p.resultat==="AUTORISE"?"pill-green":"pill-red")+'">'+p.resultat+'</span></td>'+
+      '</tr>';
+    }).join("");
+  }
+}
+
+// ── SALARIÉS ──
+function openAddSalarie() {
+  document.getElementById("modalSalTitle").textContent = "Ajouter un salarié";
+  document.getElementById("salEditId").value = "";
+  document.getElementById("salCode").value = currentCompany ? currentCompany.prefix+"-" : "";
+  document.getElementById("salCode").readOnly = false;
+  document.getElementById("salNom").value = "";
+  document.getElementById("salPoste").value = "";
+  document.getElementById("salType").value = "INTERNE";
+  document.getElementById("salStatut").value = "ACTIF";
+  document.getElementById("salChantiers").value = "";
+  document.getElementById("qrPreview").style.display = "none";
+  document.getElementById("modalSalarie").classList.add("open");
+}
+
+function editSalarie(code) {
+  var s = salaries.find(function(x){return x.code===code;});
+  if (!s) return;
+  document.getElementById("modalSalTitle").textContent = "Modifier — "+s.nom;
+  document.getElementById("salEditId").value = s.code;
+  document.getElementById("salCode").value = s.code;
+  document.getElementById("salCode").readOnly = true;
+  document.getElementById("salNom").value = s.nom;
+  document.getElementById("salPoste").value = s.poste;
+  document.getElementById("salType").value = s.type;
+  document.getElementById("salStatut").value = s.statut;
+  document.getElementById("salChantiers").value = (s.chantiers||[]).join(", ");
+  showQRInModal(s.code);
+  document.getElementById("modalSalarie").classList.add("open");
+}
+
+async function saveSalarie() {
+  var code = document.getElementById("salCode").value.trim().toUpperCase();
+  var nom = document.getElementById("salNom").value.trim();
+  var poste = document.getElementById("salPoste").value.trim();
+  var type = document.getElementById("salType").value;
+  var statut = document.getElementById("salStatut").value;
+  var chantiers = document.getElementById("salChantiers").value.split(",").map(function(c){return c.trim();}).filter(Boolean);
+  if (!code || !nom) { alert("Code et nom obligatoires"); return; }
+  var data = {code:code, nom:nom, poste:poste, type:type, statut:statut, chantiers:chantiers};
+  try {
+    var isEdit = document.getElementById("salEditId").value;
+    if (isEdit) {
+      await fetch(SUPABASE_URL+"/rest/v1/salaries?code=eq."+encodeURIComponent(code), {
+        method:"PATCH", headers:{"apikey":SUPABASE_KEY,"Authorization":"Bearer "+SUPABASE_KEY,"Content-Type":"application/json","Prefer":"return=minimal"},
+        body: JSON.stringify({nom:nom,poste:poste,type:type,statut:statut,chantiers:chantiers})
+      });
+    } else {
+      await fetch(SUPABASE_URL+"/rest/v1/salaries", {
+        method:"POST", headers:{"apikey":SUPABASE_KEY,"Authorization":"Bearer "+SUPABASE_KEY,"Content-Type":"application/json","Prefer":"return=minimal"},
+        body: JSON.stringify(data)
+      });
+    }
+  } catch(e) {}
+  closeModal("modalSalarie");
+  loadData();
+}
+
+async function toggleStatut(code, currentStatut) {
+  var newStatut = currentStatut === "ACTIF" ? "INACTIF" : "ACTIF";
+  if (!confirm((newStatut==="INACTIF"?"Désactiver":"Réactiver")+" "+code+" ?")) return;
+  try {
+    await fetch(SUPABASE_URL+"/rest/v1/salaries?code=eq."+encodeURIComponent(code), {
+      method:"PATCH", headers:{"apikey":SUPABASE_KEY,"Authorization":"Bearer "+SUPABASE_KEY,"Content-Type":"application/json","Prefer":"return=minimal"},
+      body: JSON.stringify({statut:newStatut})
+    });
+  } catch(e) {}
+  loadData();
+}
+
+async function deleteSalarie(code) {
+  if (!confirm("⚠️ Supprimer définitivement " + code + " ?\n\nCette action est irréversible.")) return;
+  try {
+    await fetch(SUPABASE_URL+"/rest/v1/salaries?code=eq."+encodeURIComponent(code), {
+      method:"DELETE",
+      headers:{"apikey":SUPABASE_KEY,"Authorization":"Bearer "+SUPABASE_KEY,"Prefer":"return=minimal"}
+    });
+  } catch(e) {}
+  loadData();
+}
+
+async function deleteCompany(id, nom) {
+  if (!confirm("⚠️ Supprimer l'entreprise \"" + nom + "\" ?\n\nTous ses salariés seront également supprimés.")) return;
+  try {
+    // Supprimer les salariés de cette entreprise
+    var comp = COMPANIES.find(function(c){return c.id===id;});
+    if (comp && comp.prefix) {
+      await fetch(SUPABASE_URL+"/rest/v1/salaries?code=like."+comp.prefix+"-*", {
+        method:"DELETE",
+        headers:{"apikey":SUPABASE_KEY,"Authorization":"Bearer "+SUPABASE_KEY,"Prefer":"return=minimal"}
+      });
+    }
+    // Supprimer l'entreprise
+    await fetch(SUPABASE_URL+"/rest/v1/entreprises?id=eq."+encodeURIComponent(id), {
+      method:"DELETE",
+      headers:{"apikey":SUPABASE_KEY,"Authorization":"Bearer "+SUPABASE_KEY,"Prefer":"return=minimal"}
+    });
+    COMPANIES = COMPANIES.filter(function(c){return c.id!==id;});
+    renderCompanyBar();
+    if (COMPANIES.length > 0) selectCompany(COMPANIES[0]);
+  } catch(e) { alert("Erreur lors de la suppression"); }
+}
+
+function showQR(code) {
+  var url = FOURNI_URL+"?v="+encodeURIComponent(code);
+  var qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=200x200&color=0F1F3D&bgcolor=ffffff&qzone=2&data="+encodeURIComponent(url);
+  var w = window.open("","_blank","width=300,height=350");
+  w.document.write('<html><body style="margin:0;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:sans-serif;background:#F2F4F8;padding:20px"><img src="'+qrUrl+'" style="width:200px;border-radius:12px"><p style="margin-top:12px;font-size:14px;font-weight:700;color:#0F1F3D">'+code+'</p><button onclick="window.print()" style="margin-top:12px;padding:10px 20px;background:#0F1F3D;color:white;border:none;border-radius:8px;cursor:pointer;font-weight:700">🖨️ Imprimer</button></body></html>');
+}
+
+function showQRInModal(code) {
+  var url = FOURNI_URL+"?v="+encodeURIComponent(code);
+  var qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=150x150&color=0F1F3D&bgcolor=ffffff&qzone=2&data="+encodeURIComponent(url);
+  document.getElementById("qrPreviewImg").src = qrUrl;
+  document.getElementById("qrPreview").style.display = "block";
+}
+
+// ── EXPORT ──
+function exportCSV(type) {
+  var data = type === "salaries" ? salaries : passages;
+  if (!data.length) { alert("Aucune donnée à exporter"); return; }
+  var keys = Object.keys(data[0]);
+  var rows = [keys];
+  data.forEach(function(d){ rows.push(keys.map(function(k){return Array.isArray(d[k])?d[k].join("|"):d[k]||"";})); });
+  var csv = rows.map(function(r){return r.join(";");}).join("\n");
+  var blob = new Blob([csv],{type:"text/csv;charset=utf-8"});
+  var a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = type+"_"+currentCompany.id+"_"+new Date().toISOString().slice(0,10)+".csv";
+  a.click();
+}
+
+function closeModal(id) { document.getElementById(id).classList.remove("open"); }
+
+var currentUser = null;
+</script>
+</body>
+</html>
