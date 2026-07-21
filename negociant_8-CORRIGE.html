@@ -220,12 +220,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);display:flex;flex-direc
         <canvas id="canvas"></canvas>
       </div>
       <div class="cam-bottom">
-        <!-- Bouton natif iPhone - ouvre directement l'appareil photo -->
-        <div style="position:relative;flex:1">
-          <button class="btn-cam">📷 Photo du QR (iPhone)</button>
-          <input type="file" accept="image/*" capture="environment" id="qrFileInput" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%">
-        </div>
-        <button class="btn-cam" onclick="startCam()" style="flex:0.8;font-size:12px">📹 Caméra live</button>
+        <button class="btn-cam" onclick="startCam()">📹 Activer caméra</button>
       </div>
       <div class="cam-st" id="camSt">Pointez vers le QR du salarié</div>
     </div>
@@ -295,38 +290,6 @@ window.onload = function() {
     document.getElementById("loginSubtitle").style.fontWeight = "700";
     document.getElementById("loginSubtitle").style.color = "#0F1F3D";
   }
-
-  // Scan natif iPhone via photo
-  document.getElementById("qrFileInput").addEventListener("change", function(e) {
-    var file = e.target.files[0];
-    if (!file) return;
-    document.getElementById("camSt").textContent = "⏳ Analyse du QR code...";
-    var img = new Image();
-    var reader = new FileReader();
-    reader.onload = function(ev) {
-      img.onload = function() {
-        var c = document.createElement("canvas");
-        c.width = img.width; c.height = img.height;
-        var ctx = c.getContext("2d");
-        ctx.drawImage(img, 0, 0);
-        var data = ctx.getImageData(0, 0, c.width, c.height);
-        var qr = jsQR(data.data, data.width, data.height);
-        if (qr) {
-          document.getElementById("camSt").textContent = "✅ QR détecté !";
-          try {
-            var url = new URL(qr.data);
-            var code = url.searchParams.get("v");
-            if (code) { showResult(code.toUpperCase()); return; }
-          } catch(e2) {}
-          showResult(qr.data.trim().toUpperCase());
-        } else {
-          document.getElementById("camSt").textContent = "❌ QR non détecté — réessayez plus près";
-        }
-      };
-      img.src = ev.target.result;
-    };
-    reader.readAsDataURL(file);
-  });
 };
 
 // Clock
