@@ -19,7 +19,9 @@ body{font-family:'Inter',sans-serif;background:var(--bg);min-height:100vh}
 .btn-logout-hdr{background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);border:none;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer}
 
 /* LOGIN ADMIN */
-#screenLogin{display:flex;align-items:center;justify-content:center;min-height:calc(100vh - 56px);padding:24px}
+#screenLogin,#screenForgot,#screenNewPwd{display:flex;align-items:center;justify-content:center;min-height:calc(100vh - 56px);padding:24px}
+.login-link{font-size:13px;color:var(--muted);cursor:pointer;text-decoration:underline}
+.login-ok{background:#EDFBF3;color:#0CAF60;border-radius:8px;padding:10px;font-size:13px;margin-top:10px;display:none}
 .login-card{background:var(--white);border-radius:20px;padding:32px;width:100%;max-width:360px;box-shadow:var(--shadow);text-align:center}
 .login-icon{font-size:40px;margin-bottom:16px}
 .login-h{font-size:22px;font-weight:800;color:var(--navy);margin-bottom:6px}
@@ -118,6 +120,47 @@ tr:hover td{background:#FAFBFF}
     </div>
     <button class="btn-login" onclick="login()">Accéder au dashboard →</button>
     <div class="login-err" id="loginErr">❌ Identifiants incorrects</div>
+    <div style="text-align:center;margin-top:14px">
+      <span class="login-link" onclick="showForgotPassword()">Mot de passe oublié ?</span>
+    </div>
+  </div>
+</div>
+
+<!-- MOT DE PASSE OUBLIÉ -->
+<div id="screenForgot" style="display:none">
+  <div class="login-card">
+    <div class="login-icon">✉️</div>
+    <div class="login-h">Mot de passe oublié</div>
+    <div class="login-p">Entrez votre email, vous recevrez un lien pour créer un nouveau mot de passe</div>
+    <div class="form-group">
+      <label class="form-lbl">Email</label>
+      <input class="form-in" id="forgotEmail" type="email" placeholder="admin@acces-pro.fr" onkeydown="if(event.key==='Enter')sendResetEmail()">
+    </div>
+    <button class="btn-login" onclick="sendResetEmail()">Envoyer le lien →</button>
+    <div class="login-err" id="forgotErr"></div>
+    <div class="login-ok" id="forgotOk">✅ Email envoyé — vérifiez votre boîte de réception</div>
+    <div style="text-align:center;margin-top:14px">
+      <span class="login-link" onclick="backToLogin()">← Retour à la connexion</span>
+    </div>
+  </div>
+</div>
+
+<!-- NOUVEAU MOT DE PASSE (arrivée depuis le lien reçu par email) -->
+<div id="screenNewPwd" style="display:none">
+  <div class="login-card">
+    <div class="login-icon">🔑</div>
+    <div class="login-h">Nouveau mot de passe</div>
+    <div class="login-p">Choisissez un nouveau mot de passe pour votre compte</div>
+    <div class="form-group">
+      <label class="form-lbl">Nouveau mot de passe</label>
+      <input class="form-in" id="newPwd1" type="password" placeholder="••••••••">
+    </div>
+    <div class="form-group">
+      <label class="form-lbl">Confirmez le mot de passe</label>
+      <input class="form-in" id="newPwd2" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')submitNewPassword()">
+    </div>
+    <button class="btn-login" onclick="submitNewPassword()">Valider →</button>
+    <div class="login-err" id="newPwdErr"></div>
   </div>
 </div>
 
@@ -317,6 +360,62 @@ async function logout() {
   if (pwdEl) pwdEl.value = "";
   await supabase.auth.signOut();
 }
+
+// ── MOT DE PASSE OUBLIÉ ──
+function showForgotPassword() {
+  document.getElementById("screenLogin").style.display = "none";
+  document.getElementById("screenForgot").style.display = "flex";
+  document.getElementById("forgotErr").style.display = "none";
+  document.getElementById("forgotOk").style.display = "none";
+  document.getElementById("forgotEmail").value = document.getElementById("loginEmail").value || "";
+}
+
+function backToLogin() {
+  document.getElementById("screenForgot").style.display = "none";
+  document.getElementById("screenLogin").style.display = "flex";
+}
+
+async function sendResetEmail() {
+  var email = document.getElementById("forgotEmail").value.trim().toLowerCase();
+  var errEl = document.getElementById("forgotErr");
+  var okEl = document.getElementById("forgotOk");
+  errEl.style.display = "none";
+  okEl.style.display = "none";
+  if (!email) return;
+  var { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.origin + window.location.pathname
+  });
+  if (error) {
+    errEl.textContent = "❌ " + error.message;
+    errEl.style.display = "block";
+    return;
+  }
+  okEl.style.display = "block";
+}
+
+async function submitNewPassword() {
+  var pwd1 = document.getElementById("newPwd1").value;
+  var pwd2 = document.getElementById("newPwd2").value;
+  var errEl = document.getElementById("newPwdErr");
+  errEl.style.display = "none";
+  if (pwd1.length < 8) { errEl.textContent = "❌ Le mot de passe doit faire au moins 8 caractères"; errEl.style.display = "block"; return; }
+  if (pwd1 !== pwd2) { errEl.textContent = "❌ Les mots de passe ne correspondent pas"; errEl.style.display = "block"; return; }
+  var { error } = await supabase.auth.updateUser({ password: pwd1 });
+  if (error) { errEl.textContent = "❌ " + error.message; errEl.style.display = "block"; return; }
+  document.getElementById("screenNewPwd").style.display = "none";
+  document.getElementById("screenLogin").style.display = "flex";
+  alert("✅ Mot de passe mis à jour, vous pouvez vous reconnecter.");
+}
+
+// Détecte l'arrivée depuis le lien de réinitialisation reçu par email
+supabase.auth.onAuthStateChange(function(event, session) {
+  if (event === "PASSWORD_RECOVERY") {
+    document.getElementById("screenLogin").style.display = "none";
+    document.getElementById("screenForgot").style.display = "none";
+    document.getElementById("screenDash").style.display = "none";
+    document.getElementById("screenNewPwd").style.display = "flex";
+  }
+});
 
 // ── ENTREPRISES ──
 function renderCompanyBar() {
