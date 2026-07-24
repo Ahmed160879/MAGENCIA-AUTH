@@ -311,6 +311,10 @@ async function loadCompanies() {
 async function logout() {
   document.getElementById("screenLogin").style.display = "flex";
   document.getElementById("screenDash").style.display = "none";
+  var emailEl = document.getElementById("loginEmail");
+  var pwdEl = document.getElementById("loginPwd");
+  if (emailEl) emailEl.value = "";
+  if (pwdEl) pwdEl.value = "";
   await supabase.auth.signOut();
 }
 
