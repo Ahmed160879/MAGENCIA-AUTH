@@ -115,6 +115,43 @@ body{font-family:'Inter',sans-serif;background:var(--bg);display:flex;flex-direc
   <div class="hint">Codes de démo :<br><strong>MAG-384729</strong> · <strong>MAG-582341</strong> · <strong>EXT-114872</strong></div>
 </div>
 
+<!-- PIN / FACE ID -->
+<div class="screen hidden" id="sPin" style="align-items:center;justify-content:center;padding:28px 24px">
+  <div class="brand-mark">🔒</div>
+  <div class="login-h" id="pinTitle">Code PIN</div>
+  <div class="login-p" id="pinSub">Entrez votre code PIN à 4 chiffres</div>
+
+  <div id="pinScreenFields">
+    <div class="field">
+      <label class="field-lbl">Code PIN</label>
+      <input class="field-in" id="pinIn" type="password" inputmode="numeric" placeholder="••••" maxlength="4" autocomplete="off" onkeydown="if(event.key==='Enter'){document.getElementById('pinConfirmWrap').classList.contains('hidden')?submitPin():document.getElementById('pinConfirmIn').focus()}">
+    </div>
+    <div class="field hidden" id="pinConfirmWrap">
+      <label class="field-lbl">Confirmez le code PIN</label>
+      <input class="field-in" id="pinConfirmIn" type="password" inputmode="numeric" placeholder="••••" maxlength="4" autocomplete="off" onkeydown="if(event.key==='Enter')submitPin()">
+    </div>
+    <button class="btn" id="pinBtn" onclick="submitPin()">Valider →</button>
+  </div>
+
+  <div class="hidden" id="faceIdScreenFields" style="width:100%;max-width:300px">
+    <button class="btn" onclick="unlockWithFaceId()">🆔 Déverrouiller</button>
+    <div class="hint" style="cursor:pointer;text-decoration:underline;margin-top:14px" onclick="usePinInstead()">Utiliser mon code PIN</div>
+  </div>
+
+  <div class="err" id="pinErr"></div>
+  <div class="loading" id="pinLoading">⏳ Vérification...</div>
+  <div class="hint" style="cursor:pointer;text-decoration:underline" onclick="backToCode()">← Changer de code personnel</div>
+</div>
+
+<!-- Proposition d'activation Face ID / Touch ID (juste après la création du PIN) -->
+<div class="screen hidden" id="sFaceIdOffer" style="align-items:center;justify-content:center;padding:28px 24px">
+  <div class="brand-mark">🆔</div>
+  <div class="login-h">Activer Face ID ?</div>
+  <div class="login-p">La prochaine fois, déverrouillez votre carte plus vite, sans retaper votre code PIN.</div>
+  <button class="btn" onclick="enableFaceId()">Activer →</button>
+  <button class="btn" style="background:transparent;color:var(--muted);border:1.5px solid var(--border);margin-top:10px" onclick="skipFaceId()">Plus tard</button>
+</div>
+
 <!-- TABS (après connexion) -->
 <div class="hidden" id="tabBar" style="padding:14px 0 0">
   <div class="tabs">
@@ -195,6 +232,8 @@ var SUPABASE_KEY = "sb_publishable_Hb6ILSc7bzW_sC6ZD2X7Nw_QP5homkU";
 var FOURNI_URL = "https://ahmed160879.github.io/MAGENCIA-AUTH/fournisseur-supabase_7.html";
 var supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 var currentCode = null;
+var pendingUser = null;
+var pinMode = null;
 
 var DEMO = {
   "MAG-384729":{nom:"EL MRABET Ahmed",poste:"Gérant",type:"INTERNE",statut:"ACTIF",chantiers:["NOZ Brioude","Patriarca","Carter Cash Angoulins","Stow Your Bags"]},
@@ -268,6 +307,187 @@ async function login() {
   if (!user || user.statut === "INACTIF") { document.getElementById("err").style.display = "block"; return; }
 
   currentCode = code;
+  pendingUser = user;
+  await goToPinStep();
+}
+
+async function goToPinStep() {
+  var hasPin = false;
+  try {
+    var { data, error } = await supabase.rpc('salarie_has_pin', { p_code: currentCode });
+    hasPin = !error && data === true;
+  } catch(e) { console.error("salarie_has_pin error", e); }
+
+  pinMode = hasPin ? "verify" : "setup";
+  document.getElementById("pinErr").style.display = "none";
+  document.getElementById("sLogin").classList.add("hidden");
+  document.getElementById("sFaceIdOffer").classList.add("hidden");
+  document.getElementById("sPin").classList.remove("hidden");
+
+  var storedCred = hasPin ? localStorage.getItem("webauthn_cred_" + currentCode) : null;
+  if (storedCred) {
+    showFaceIdStep(storedCred);
+  } else {
+    showPinFields();
+  }
+}
+
+function showPinFields() {
+  document.getElementById("pinIn").value = "";
+  document.getElementById("pinConfirmIn").value = "";
+  document.getElementById("pinErr").style.display = "none";
+  document.getElementById("pinConfirmWrap").classList.toggle("hidden", pinMode !== "setup");
+  document.getElementById("pinTitle").textContent = pinMode === "setup" ? "Créez votre code PIN" : "Code PIN";
+  document.getElementById("pinSub").textContent = pinMode === "setup"
+    ? "Ce code à 4 chiffres protège votre carte : personne d'autre ne pourra l'ouvrir sans le connaître."
+    : "Entrez votre code PIN pour accéder à votre carte";
+  document.getElementById("pinBtn").textContent = pinMode === "setup" ? "Créer →" : "Déverrouiller →";
+  document.getElementById("pinScreenFields").classList.remove("hidden");
+  document.getElementById("faceIdScreenFields").classList.add("hidden");
+  setTimeout(function(){ var f = document.getElementById("pinIn"); if (f) f.focus(); }, 50);
+}
+
+function showFaceIdStep(rawIdB64) {
+  window._pendingCredId = rawIdB64;
+  document.getElementById("pinErr").style.display = "none";
+  document.getElementById("pinTitle").textContent = "Déverrouillage rapide";
+  document.getElementById("pinSub").textContent = "Utilisez Face ID / Touch ID pour ouvrir votre carte";
+  document.getElementById("pinScreenFields").classList.add("hidden");
+  document.getElementById("faceIdScreenFields").classList.remove("hidden");
+}
+
+function usePinInstead() {
+  pinMode = "verify";
+  showPinFields();
+}
+
+async function unlockWithFaceId() {
+  var errEl = document.getElementById("pinErr");
+  errEl.style.display = "none";
+  try {
+    var rawId = Uint8Array.from(atob(window._pendingCredId), function(c){ return c.charCodeAt(0); });
+    var challenge = new Uint8Array(32);
+    crypto.getRandomValues(challenge);
+    var assertion = await navigator.credentials.get({
+      publicKey: {
+        challenge: challenge,
+        allowCredentials: [{ id: rawId, type: "public-key" }],
+        userVerification: "required",
+        timeout: 60000
+      }
+    });
+    if (assertion) showCarte(pendingUser);
+  } catch(e) {
+    console.error("unlockWithFaceId error", e);
+    errEl.textContent = "Face ID indisponible — utilisez votre code PIN";
+    errEl.style.display = "block";
+    usePinInstead();
+  }
+}
+
+async function maybeOfferFaceId() {
+  var supported = false;
+  try {
+    supported = !!(window.PublicKeyCredential && navigator.credentials && await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable());
+  } catch(e) { supported = false; }
+  if (supported && !localStorage.getItem("webauthn_cred_" + currentCode)) {
+    document.getElementById("sPin").classList.add("hidden");
+    document.getElementById("sFaceIdOffer").classList.remove("hidden");
+  } else {
+    showCarte(pendingUser);
+  }
+}
+
+async function enableFaceId() {
+  try {
+    var challenge = new Uint8Array(32);
+    crypto.getRandomValues(challenge);
+    var userId = new TextEncoder().encode(currentCode);
+    var cred = await navigator.credentials.create({
+      publicKey: {
+        challenge: challenge,
+        rp: { name: "NégoceID" },
+        user: { id: userId, name: currentCode, displayName: pendingUser ? pendingUser.nom : currentCode },
+        pubKeyCredParams: [{ type: "public-key", alg: -7 }, { type: "public-key", alg: -257 }],
+        authenticatorSelection: { authenticatorAttachment: "platform", userVerification: "required" },
+        timeout: 60000
+      }
+    });
+    var rawId = btoa(String.fromCharCode.apply(null, new Uint8Array(cred.rawId)));
+    localStorage.setItem("webauthn_cred_" + currentCode, rawId);
+  } catch(e) { console.error("enableFaceId error", e); }
+  document.getElementById("sFaceIdOffer").classList.add("hidden");
+  showCarte(pendingUser);
+}
+
+function skipFaceId() {
+  document.getElementById("sFaceIdOffer").classList.add("hidden");
+  showCarte(pendingUser);
+}
+
+function backToCode() {
+  pendingUser = null;
+  currentCode = null;
+  document.getElementById("sPin").classList.add("hidden");
+  document.getElementById("sFaceIdOffer").classList.add("hidden");
+  document.getElementById("sLogin").classList.remove("hidden");
+}
+
+async function submitPin() {
+  var pin = document.getElementById("pinIn").value.trim();
+  var errEl = document.getElementById("pinErr");
+  errEl.style.display = "none";
+  if (!/^[0-9]{4}$/.test(pin)) { errEl.textContent = "❌ Le code PIN doit contenir 4 chiffres"; errEl.style.display = "block"; return; }
+
+  var btn = document.getElementById("pinBtn");
+  btn.disabled = true;
+  document.getElementById("pinLoading").style.display = "block";
+
+  if (pinMode === "setup") {
+    var confirmPin = document.getElementById("pinConfirmIn").value.trim();
+    if (pin !== confirmPin) {
+      document.getElementById("pinLoading").style.display = "none";
+      btn.disabled = false;
+      errEl.textContent = "❌ Les deux codes ne correspondent pas";
+      errEl.style.display = "block";
+      return;
+    }
+    try {
+      var { data, error } = await supabase.rpc('set_salarie_pin', { p_code: currentCode, p_pin: pin });
+      document.getElementById("pinLoading").style.display = "none";
+      btn.disabled = false;
+      if (error || !data) { errEl.textContent = "❌ Impossible de créer le code PIN"; errEl.style.display = "block"; return; }
+      await maybeOfferFaceId();
+    } catch(e) {
+      document.getElementById("pinLoading").style.display = "none";
+      btn.disabled = false;
+      errEl.textContent = "❌ Erreur, réessayez";
+      errEl.style.display = "block";
+    }
+  } else {
+    try {
+      var { data: ok, error } = await supabase.rpc('verify_salarie_pin', { p_code: currentCode, p_pin: pin });
+      document.getElementById("pinLoading").style.display = "none";
+      btn.disabled = false;
+      if (error || !ok) {
+        errEl.textContent = "❌ Code PIN incorrect";
+        errEl.style.display = "block";
+        document.getElementById("pinIn").value = "";
+        document.getElementById("pinIn").focus();
+        return;
+      }
+      await maybeOfferFaceId();
+    } catch(e) {
+      document.getElementById("pinLoading").style.display = "none";
+      btn.disabled = false;
+      errEl.textContent = "❌ Erreur, réessayez";
+      errEl.style.display = "block";
+    }
+  }
+}
+
+function showCarte(user) {
+  var code = currentCode;
   var prefix = code.split("-")[0];
   var companyNames = {"MAG":"MAGENCIA","EXT":"Sous-traitant","ATL":"ATLAS","MAR":"BTP Martin SAS"};
   var companyName = user.entreprise || companyNames[prefix] || prefix;
@@ -279,9 +499,9 @@ async function login() {
   document.getElementById("icCode").textContent = code;
   document.getElementById("blHeaderName").textContent = user.nom;
 
-  var savedPhoto = localStorage.getItem("photo_" + code);
-  if (savedPhoto) {
-    document.getElementById("icPhotoImg").src = savedPhoto;
+  var photo = user.photo || localStorage.getItem("photo_" + code);
+  if (photo) {
+    document.getElementById("icPhotoImg").src = photo;
     document.getElementById("icPhotoImg").style.display = "block";
     document.getElementById("icPhotoEmoji").style.display = "none";
   } else {
@@ -295,6 +515,7 @@ async function login() {
   document.getElementById("qrImg").src = "https://api.qrserver.com/v1/create-qr-code/?size=185x185&color=0F1F3D&bgcolor=ffffff&qzone=2&data=" + encodeURIComponent(url);
 
   document.getElementById("sLogin").classList.add("hidden");
+  document.getElementById("sPin").classList.add("hidden");
   document.getElementById("tabBar").classList.remove("hidden");
   document.getElementById("sCarte").classList.remove("hidden");
   document.getElementById("sBL").classList.add("hidden");
@@ -305,19 +526,39 @@ function loadPhoto(input) {
   if (!file) return;
   var reader = new FileReader();
   reader.onload = function(e) {
-    var src = e.target.result;
-    document.getElementById("icPhotoImg").src = src;
-    document.getElementById("icPhotoImg").style.display = "block";
-    document.getElementById("icPhotoEmoji").style.display = "none";
-    try { localStorage.setItem("photo_" + currentCode, src); } catch(e) {}
+    var img = new Image();
+    img.onload = function() {
+      var maxSize = 300;
+      var scale = Math.min(1, maxSize / Math.max(img.width, img.height));
+      var canvas = document.createElement("canvas");
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      var ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      var compressed = canvas.toDataURL("image/jpeg", 0.75);
+
+      document.getElementById("icPhotoImg").src = compressed;
+      document.getElementById("icPhotoImg").style.display = "block";
+      document.getElementById("icPhotoEmoji").style.display = "none";
+      try { localStorage.setItem("photo_" + currentCode, compressed); } catch(e) {}
+
+      supabase.rpc('set_salarie_photo', { p_code: currentCode, p_photo: compressed }).then(function(res) {
+        if (res.error) console.error("set_salarie_photo error", res.error);
+      });
+    };
+    img.src = e.target.result;
   };
   reader.readAsDataURL(file);
 }
 
 function out() {
   currentCode = null;
+  pendingUser = null;
+  pinMode = null;
   document.getElementById("codeIn").value = "";
   document.getElementById("sLogin").classList.remove("hidden");
+  document.getElementById("sPin").classList.add("hidden");
+  document.getElementById("sFaceIdOffer").classList.add("hidden");
   document.getElementById("tabBar").classList.add("hidden");
   document.getElementById("sCarte").classList.add("hidden");
   document.getElementById("sBL").classList.add("hidden");
