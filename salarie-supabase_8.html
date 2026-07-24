@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>NégoceID — Ma carte</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
@@ -192,6 +193,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);display:flex;flex-direc
 var SUPABASE_URL = "https://rzveghiwbjafmfhrfscb.supabase.co";
 var SUPABASE_KEY = "sb_publishable_Hb6ILSc7bzW_sC6ZD2X7Nw_QP5homkU";
 var FOURNI_URL = "https://ahmed160879.github.io/MAGENCIA-AUTH/fournisseur-supabase_7.html";
+var supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 var currentCode = null;
 
 var DEMO = {
@@ -203,12 +205,9 @@ var DEMO = {
 
 async function fetchSalarie(code) {
   try {
-    var res = await fetch(SUPABASE_URL + "/rest/v1/salaries?code=eq." + encodeURIComponent(code) + "&select=*", {
-      headers: {"apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY}
-    });
-    var data = await res.json();
-    if (data && data.length > 0) return data[0];
-  } catch(e) {}
+    var { data, error } = await supabase.rpc('get_salarie_by_code', { p_code: code });
+    if (!error && Array.isArray(data) && data.length > 0) return data[0];
+  } catch(e) { console.error("fetchSalarie error", e); }
   return DEMO[code] ? Object.assign({code: code}, DEMO[code]) : null;
 }
 
@@ -216,10 +215,8 @@ async function loadBL() {
   if (!currentCode) return;
   document.getElementById("blList").innerHTML = '<div class="bl-empty"><div class="bl-empty-icon">⏳</div>Chargement...</div>';
   try {
-    var res = await fetch(SUPABASE_URL + "/rest/v1/passages?code_salarie=eq." + encodeURIComponent(currentCode) + "&order=created_at.desc&limit=50&select=*", {
-      headers: {"apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY}
-    });
-    var passages = await res.json();
+    var { data: passages, error } = await supabase.rpc('get_passages_by_code', { p_code: currentCode });
+    if (error) throw error;
     if (!Array.isArray(passages)) passages = [];
 
     document.getElementById("blTotal").textContent = passages.length;
