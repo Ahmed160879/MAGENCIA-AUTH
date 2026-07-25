@@ -19,7 +19,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);min-height:100vh}
 .btn-logout-hdr{background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);border:none;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer}
 
 /* LOGIN ADMIN */
-#screenLogin,#screenForgot,#screenNewPwd{display:flex;align-items:center;justify-content:center;min-height:calc(100vh - 56px);padding:24px}
+#screenLogin,#screenForgot,#screenNewPwd,#screenPending{display:flex;align-items:center;justify-content:center;min-height:calc(100vh - 56px);padding:24px}
 .login-link{font-size:13px;color:var(--muted);cursor:pointer;text-decoration:underline}
 .login-ok{background:#EDFBF3;color:#0CAF60;border-radius:8px;padding:10px;font-size:13px;margin-top:10px;display:none}
 .login-card{background:var(--white);border-radius:20px;padding:32px;width:100%;max-width:360px;box-shadow:var(--shadow);text-align:center}
@@ -164,6 +164,16 @@ tr:hover td{background:#FAFBFF}
   </div>
 </div>
 
+<!-- COMPTE EN ATTENTE DE VALIDATION -->
+<div id="screenPending" style="display:none">
+  <div class="login-card">
+    <div class="login-icon">🕐</div>
+    <div class="login-h">Compte en attente</div>
+    <div class="login-p">Votre demande d'inscription a bien été reçue. Votre compte sera activé sous 24h ouvrées — vous recevrez un message de confirmation.</div>
+    <button class="btn-login" onclick="logout()">← Retour à la connexion</button>
+  </div>
+</div>
+
 <!-- DASHBOARD -->
 <div id="screenDash">
   <!-- SÉLECTEUR ENTREPRISES -->
@@ -172,6 +182,17 @@ tr:hover td{background:#FAFBFF}
     <div class="company-bar" id="companyBar">
       <button class="btn-add-company" onclick="openAddCompany()">+ Nouvelle entreprise</button>
     </div>
+  </div>
+
+  <!-- DEMANDES EN ATTENTE -->
+  <div class="section" id="pendingSection" style="display:none">
+    <div class="section-hdr">
+      <div class="section-title">🕐 Demandes d'inscription en attente</div>
+    </div>
+    <table>
+      <thead><tr><th>Entreprise</th><th>Email</th><th>Préfixe</th><th>Action</th></tr></thead>
+      <tbody id="pendingBody"></tbody>
+    </table>
   </div>
 
   <!-- KPIs -->
@@ -326,15 +347,52 @@ async function login() {
   errEl.style.display = "none";
   currentUser = appUser; // { role, company_id, agence, ... }
   await loadCompanies();
+
+  if (currentUser.role !== "super_admin") {
+    var myComp = COMPANIES.find(function(c){return c.id === currentUser.company_id;});
+    if (myComp && myComp.statut === "en_attente") {
+      document.getElementById("screenLogin").style.display = "none";
+      document.getElementById("screenPending").style.display = "flex";
+      return;
+    }
+  }
+
   document.getElementById("screenLogin").style.display = "none";
   document.getElementById("screenDash").style.display = "block";
   renderCompanyBar();
+  renderPendingRequests();
   if (currentUser.role === "super_admin") {
     if (COMPANIES.length > 0) selectCompany(COMPANIES[0]);
   } else {
     var comp = COMPANIES.find(function(c){return c.id === currentUser.company_id;});
     selectCompany(comp || COMPANIES[0]);
   }
+}
+
+function renderPendingRequests() {
+  var section = document.getElementById("pendingSection");
+  if (!section) return;
+  if (currentUser.role !== "super_admin") { section.style.display = "none"; return; }
+  var pending = COMPANIES.filter(function(c){ return c.statut === "en_attente"; });
+  if (pending.length === 0) { section.style.display = "none"; return; }
+  section.style.display = "block";
+  document.getElementById("pendingBody").innerHTML = pending.map(function(c) {
+    return '<tr>'+
+      '<td>'+c.nom+'</td>'+
+      '<td>'+(c.email_admin||"—")+'</td>'+
+      '<td>'+(c.prefix||"—")+'</td>'+
+      '<td><button class="btn-action btn-gold" onclick="activateCompany(\''+c.id+'\')">✅ Activer</button></td>'+
+    '</tr>';
+  }).join("");
+}
+
+async function activateCompany(id) {
+  var { error } = await supabase.from('entreprises').update({ statut: 'actif' }).eq('id', id);
+  if (error) { alert("❌ Échec de l'activation :\n" + error.message); return; }
+  await loadCompanies();
+  renderCompanyBar();
+  renderPendingRequests();
+  alert("✅ Entreprise activée");
 }
 
 async function loadCompanies() {
