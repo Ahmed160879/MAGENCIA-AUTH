@@ -271,13 +271,6 @@ body{font-family:'Inter',sans-serif;background:var(--bg);display:flex;flex-direc
 <script>
 var SUPABASE_URL = "https://rzveghiwbjafmfhrfscb.supabase.co";
 var SUPABASE_KEY = "sb_publishable_Hb6ILSc7bzW_sC6ZD2X7Nw_QP5homkU";
-var AGENCY_EMAIL = {
-  "POINT P Bordeaux": "nego-pointp-bordeaux@acces-pro.fr",
-  "POINT P Merignac": "nego-pointp-merignac@acces-pro.fr",
-  "BIGMAT Castres-Gironde": "nego-bigmat-castres@acces-pro.fr",
-  "CEDEO Merignac": "nego-cedeo-merignac@acces-pro.fr",
-  "SOCODA Langon": "nego-socoda-langon@acces-pro.fr"
-};
 var supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 var currentNego = null;
 // Lire le nom de l'agence depuis l'URL
@@ -318,10 +311,23 @@ async function loginNego() {
   var pwd = document.getElementById("loginPwd").value;
   var err = document.getElementById("loginErr");
   if (!nego) { err.textContent = "❌ Agence manquante dans le lien (paramètre ?nego=...)"; err.style.display = "block"; return; }
-  var email = AGENCY_EMAIL[nego];
-  if (!email) { err.textContent = "❌ Agence inconnue"; err.style.display = "block"; return; }
+
   var btn = document.querySelector(".btn-login");
   if (btn) { btn.disabled = true; btn.textContent = "Connexion..."; }
+
+  var email = null;
+  try {
+    var { data: emailData, error: emailErr } = await supabase.rpc('get_negociant_email', { p_agence: nego });
+    if (!emailErr && emailData) email = emailData;
+  } catch(e) { console.error("get_negociant_email error", e); }
+
+  if (!email) {
+    if (btn) { btn.disabled = false; btn.textContent = "Accéder →"; }
+    err.textContent = "❌ Agence inconnue";
+    err.style.display = "block";
+    return;
+  }
+
   var { data, error } = await supabase.auth.signInWithPassword({ email: email, password: pwd });
   if (btn) { btn.disabled = false; btn.textContent = "Accéder →"; }
   if (error) { err.textContent = "❌ Code incorrect"; err.style.display = "block"; return; }
