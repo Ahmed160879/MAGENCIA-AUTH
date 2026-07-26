@@ -198,26 +198,26 @@ body{font-family:'Inter',sans-serif;background:var(--bg);display:flex;flex-direc
     </div>
     <div class="bl-card" id="blCard" style="display:none">
       <div class="bl-header">
-        <div class="bl-title">📄 Bon de livraison</div>
-        <div class="bl-optional">Optionnel</div>
+        <div class="bl-title">🏗️ Chantier du retrait</div>
+        <div class="bl-optional" style="background:rgba(229,57,53,0.28);color:#FFB4B0">Obligatoire</div>
       </div>
-      <div class="bl-row">
-        <input class="bl-input" id="blInput" type="text" placeholder="N° BL" autocomplete="off" autocorrect="off" spellcheck="false" onfocus="cancelAutoReset()" onkeydown="if(event.key==='Enter')saveBL()">
-        <button class="bl-btn" onclick="saveBL()">✓</button>
+      <div class="bl-row" id="chantierFieldWrap">
+        <input class="bl-input" id="chantierInput" type="text" placeholder="Nom du chantier" autocomplete="off" autocorrect="off" spellcheck="false" onfocus="cancelAutoReset()">
       </div>
-      <div style="margin-top:10px">
-        <div style="font-size:10px;font-weight:700;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:6px">🏗️ Référence chantier</div>
-        <div class="bl-row" id="chantierFieldWrap">
-          <input class="bl-input" id="chantierInput" type="text" placeholder="Nom du chantier" autocomplete="off" autocorrect="off" spellcheck="false" onfocus="cancelAutoReset()">
+      <div class="err" id="chantierErr" style="display:none;margin-top:8px;max-width:none">❌ Sélectionnez un chantier autorisé avant de valider le retrait</div>
+      <div style="margin-top:14px">
+        <div style="font-size:10px;font-weight:700;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:6px">📄 N° de bon de livraison (optionnel)</div>
+        <div class="bl-row">
+          <input class="bl-input" id="blInput" type="text" placeholder="N° BL" autocomplete="off" autocorrect="off" spellcheck="false" onfocus="cancelAutoReset()" onkeydown="if(event.key==='Enter')saveBL()">
         </div>
-        <div class="err" id="chantierErr" style="display:none;margin-top:8px;max-width:none">❌ Ce chantier n'est pas autorisé pour ce salarié</div>
       </div>
+      <button class="bl-btn" style="width:100%;margin-top:14px;padding:14px" onclick="saveBL()">✓ Valider le retrait pour ce chantier</button>
       <div class="bl-saved" id="blSaved">
         <div style="font-size:16px">✅</div>
-        <div class="bl-saved-txt" id="blSavedTxt">BL enregistré</div>
+        <div class="bl-saved-txt" id="blSavedTxt">Retrait validé</div>
       </div>
     </div>
-    <div class="saved-card">
+    <div class="saved-card" id="savedCard" style="display:none">
       <div style="font-size:18px">✅</div>
       <div class="saved-text">Passage enregistré<br><strong id="savedInfo">—</strong></div>
     </div>
@@ -406,6 +406,8 @@ async function showResult(code) {
   renderChantierField(window._currentAuthorizedChantiers);
   document.getElementById("chantierErr").style.display = "none";
   document.getElementById("blSaved").style.display = "none";
+  // Le passage n'est présenté comme confirmé qu'une fois un chantier autorisé validé (saveBL)
+  document.getElementById("savedCard").style.display = "none";
   document.getElementById("savedInfo").textContent = currentNego + " · " + code;
 
   var now = new Date();
@@ -445,21 +447,18 @@ async function saveBL() {
   var errEl = document.getElementById("chantierErr");
   errEl.style.display = "none";
 
-  // Sécurité : un chantier renseigné doit obligatoirement faire partie des
-  // chantiers autorisés du salarié — aucune exception, aucun contournement possible
-  // (le champ est un menu déroulant, mais on revalide ici par sécurité).
-  if (chantier) {
-    var authorized = (window._currentAuthorizedChantiers || []);
-    if (authorized.indexOf(chantier) === -1) {
-      errEl.style.display = "block";
-      return;
-    }
+  // Le chantier est désormais obligatoire : impossible de valider un retrait sans
+  // préciser (et faire valider) le chantier concerné parmi les chantiers autorisés
+  // du salarié — c'est ce qui garantit qu'il ne prend de la marchandise que sur un
+  // chantier pour lequel il est réellement autorisé.
+  var authorized = (window._currentAuthorizedChantiers || []);
+  if (!chantier || authorized.indexOf(chantier) === -1) {
+    errEl.style.display = "block";
+    return;
   }
 
-  if (!bl && !chantier) return;
-  var body = {};
+  var body = { chantier: chantier };
   if (bl) body.bon_livraison = bl;
-  if (chantier) body.chantier = chantier;
   var saved = false;
   try {
     if (currentPassageId) {
@@ -478,13 +477,14 @@ async function saveBL() {
       if (error2) console.error("saveBL fallback update failed", error2);
     }
   } catch(e) { console.error("saveBL error", e); }
-  var msg = [];
-  if (bl) msg.push("BL " + bl);
-  if (chantier) msg.push("Chantier : " + chantier);
-  document.getElementById("blSavedTxt").textContent = (saved ? "" : "⚠️ ") + msg.join(" · ") + (saved ? " enregistré ✓" : " — échec enregistrement");
+
+  var msg = "Chantier : " + chantier + (bl ? " · BL " + bl : "");
+  document.getElementById("blSavedTxt").textContent = (saved ? "" : "⚠️ ") + msg + (saved ? " ✓" : " — échec enregistrement");
   document.getElementById("blSaved").style.display = "flex";
-  document.getElementById("blInput").value = "";
-  document.getElementById("chantierInput").value = "";
+
+  if (saved) {
+    document.getElementById("savedCard").style.display = "flex";
+  }
 }
 
 function verifyManual() {
