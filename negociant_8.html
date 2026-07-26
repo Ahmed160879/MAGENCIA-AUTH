@@ -436,32 +436,37 @@ async function markDemandeTraiteeNego(id) {
   loadDemandesNego();
 }
 
-async function fetchSalarie(code) {
-  try {
-    var { data, error } = await supabase.rpc('get_salarie_by_code', { p_code: code });
-    if (!error && Array.isArray(data) && data.length > 0) return data[0];
-  } catch(e) { console.error("fetchSalarie error", e); }
-  return DEMO[code] ? Object.assign({code: code}, DEMO[code]) : null;
-}
-
-async function logPassage(code, user, ok) {
-  currentPassageId = null;
-  try {
-    var { data, error } = await supabase
-      .from('passages')
-      .insert({ code_salarie: code, nom_salarie: user ? user.nom : "INCONNU", agence: currentNego, resultat: ok ? "AUTORISE" : "REFUSE", chantiers: user ? user.chantiers : [] })
-      .select()
-      .single();
-    if (!error && data && data.id) currentPassageId = data.id;
-    else if (error) console.error("logPassage insert failed", error);
-  } catch(e) { console.error("logPassage error", e); }
-}
-
+// Le verdict AUTORISE/REFUSE et l'enregistrement du passage sont désormais
+// entièrement calculés côté serveur (fonction log_passage) : impossible pour
+// le navigateur d'imposer un résultat, quel que soit ce qu'il envoie.
 async function showResult(code) {
   currentPassageCode = code;
-  var user = await fetchSalarie(code);
-  var ok = user && user.statut === "ACTIF" && user.chantiers && user.chantiers.length > 0;
-  await logPassage(code, user, ok);
+  currentPassageId = null;
+  var user = null, ok = false, serverOk = false;
+  try {
+    var { data, error } = await supabase.rpc('log_passage', { p_code: code, p_agence: currentNego });
+    if (error) throw error;
+    var row = Array.isArray(data) ? data[0] : data;
+    if (row) {
+      serverOk = true;
+      currentPassageId = row.passage_id;
+      ok = row.resultat === "AUTORISE";
+      if (row.code) {
+        user = { code: row.code, nom: row.nom, poste: row.poste, type: row.type, statut: row.statut, chantiers: row.chantiers };
+      }
+    }
+  } catch(e) { console.error("log_passage error", e); }
+
+  if (!serverOk) {
+    // Le serveur n'a pas pu être contacté : on retombe sur les codes de démo
+    // (pour ne pas bloquer une démo hors-ligne), mais aucun passage réel n'est
+    // enregistré dans ce cas.
+    var demo = DEMO[code];
+    if (demo) {
+      user = Object.assign({code: code}, demo);
+      ok = user.statut === "ACTIF" && user.chantiers && user.chantiers.length > 0;
+    }
+  }
 
   var prefix = code.split("-")[0];
   var companyName = user && user.entreprise ? user.entreprise : (companyNames[prefix] || prefix);
@@ -551,46 +556,41 @@ async function saveBL() {
   var errEl = document.getElementById("chantierErr");
   errEl.style.display = "none";
 
-  // Le chantier est désormais obligatoire : impossible de valider un retrait sans
-  // préciser (et faire valider) le chantier concerné. Si le salarié est autorisé sur
-  // des chantiers précis, la valeur doit exactement correspondre à l'un d'eux (le champ
-  // est de toute façon un menu déroulant limité à cette liste). Si le salarié est
-  // autorisé sur "Tous chantiers", n'importe quel chantier non vide est accepté.
-  var authorized = (window._currentAuthorizedChantiers || []);
-  var isUnrestricted = authorized.some(isTousChantiersValue);
-  if (!chantier || (!isUnrestricted && authorized.indexOf(chantier) === -1)) {
+  if (!chantier) {
+    errEl.textContent = "❌ Sélectionnez un chantier autorisé avant de valider le retrait";
+    errEl.style.display = "block";
+    return;
+  }
+  if (!currentPassageId) {
+    errEl.textContent = "❌ Passage non enregistré côté serveur — rescannez le salarié";
     errEl.style.display = "block";
     return;
   }
 
-  var body = { chantier: chantier };
-  if (bl) body.bon_livraison = bl;
+  // Le chantier saisi est revalidé côté serveur (fonction validate_passage_chantier) :
+  // impossible d'enregistrer un chantier qui ne fait pas partie de la vraie liste
+  // autorisée du salarié, quel que soit ce que le navigateur envoie.
   var saved = false;
   try {
-    if (currentPassageId) {
-      var { error } = await supabase.from('passages').update(body).eq('id', currentPassageId);
-      saved = !error;
-      if (error) console.error("saveBL update failed", error);
-    } else {
-      var { error: error2 } = await supabase
-        .from('passages')
-        .update(body)
-        .eq('code_salarie', currentPassageCode)
-        .eq('agence', currentNego)
-        .order('created_at', { ascending: false })
-        .limit(1);
-      saved = !error2;
-      if (error2) console.error("saveBL fallback update failed", error2);
-    }
+    var { data, error } = await supabase.rpc('validate_passage_chantier', {
+      p_passage_id: currentPassageId,
+      p_chantier: chantier,
+      p_bon_livraison: bl || null
+    });
+    if (error) throw error;
+    saved = data === true;
   } catch(e) { console.error("saveBL error", e); }
 
-  var msg = "Chantier : " + chantier + (bl ? " · BL " + bl : "");
-  document.getElementById("blSavedTxt").textContent = (saved ? "" : "⚠️ ") + msg + (saved ? " ✓" : " — échec enregistrement");
-  document.getElementById("blSaved").style.display = "flex";
-
-  if (saved) {
-    document.getElementById("savedCard").style.display = "flex";
+  if (!saved) {
+    errEl.textContent = "❌ Sélectionnez un chantier autorisé avant de valider le retrait";
+    errEl.style.display = "block";
+    return;
   }
+
+  var msg = "Chantier : " + chantier + (bl ? " · BL " + bl : "");
+  document.getElementById("blSavedTxt").textContent = msg + " ✓";
+  document.getElementById("blSaved").style.display = "flex";
+  document.getElementById("savedCard").style.display = "flex";
 }
 
 function verifyManual() {
