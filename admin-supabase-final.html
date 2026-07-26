@@ -333,7 +333,6 @@ tr:hover td{background:#FAFBFF}
 <script>
 var SUPABASE_URL = "https://rzveghiwbjafmfhrfscb.supabase.co";
 var SUPABASE_KEY = "sb_publishable_Hb6ILSc7bzW_sC6ZD2X7Nw_QP5homkU";
-var FOURNI_URL = "https://ahmed160879.github.io/MAGENCIA-AUTH/fournisseur-supabase.html";
 
 // Entreprises chargées depuis Supabase
 var COMPANIES = [];
@@ -767,15 +766,14 @@ async function deleteSalarie(code) {
 }
 
 function showQR(code) {
-  var url = FOURNI_URL+"?v="+encodeURIComponent(code);
-  var qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=200x200&color=0F1F3D&bgcolor=ffffff&qzone=2&data="+encodeURIComponent(url);
+  // Le QR encode uniquement le code salarié (lu tel quel côté négociant, caméra ou lecteur USB)
+  var qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=200x200&color=0F1F3D&bgcolor=ffffff&qzone=2&data="+encodeURIComponent(code);
   var w = window.open("","_blank","width=300,height=350");
   w.document.write('<html><body style="margin:0;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:sans-serif;background:#F2F4F8;padding:20px"><img src="'+qrUrl+'" style="width:200px;border-radius:12px"><p style="margin-top:12px;font-size:14px;font-weight:700;color:#0F1F3D">'+code+'</p><button onclick="window.print()" style="margin-top:12px;padding:10px 20px;background:#0F1F3D;color:white;border:none;border-radius:8px;cursor:pointer;font-weight:700">🖨️ Imprimer</button></body></html>');
 }
 
 function showQRInModal(code) {
-  var url = FOURNI_URL+"?v="+encodeURIComponent(code);
-  var qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=150x150&color=0F1F3D&bgcolor=ffffff&qzone=2&data="+encodeURIComponent(url);
+  var qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=150x150&color=0F1F3D&bgcolor=ffffff&qzone=2&data="+encodeURIComponent(code);
   document.getElementById("qrPreviewImg").src = qrUrl;
   document.getElementById("qrPreview").style.display = "block";
 }

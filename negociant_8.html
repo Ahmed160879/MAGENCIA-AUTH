@@ -338,6 +338,25 @@ async function loginNego() {
   document.getElementById("sLogin").classList.add("hidden");
   document.getElementById("tabBar").classList.remove("hidden");
   document.getElementById("sScan").classList.remove("hidden");
+  // Focus le champ de saisie manuelle : permet à un lecteur de code-barres/QR USB
+  // (qui se comporte comme un clavier) de scanner directement sans clic préalable.
+  focusManualInput();
+}
+
+function focusManualInput() {
+  setTimeout(function(){ var f = document.getElementById("mi"); if (f) f.focus(); }, 50);
+}
+
+// Extrait le code salarié depuis le contenu brut d'un QR (ou d'une saisie/scan USB) :
+// si c'est une URL contenant un paramètre "v", on l'utilise ; sinon on prend le texte tel quel.
+function extractCode(raw) {
+  var v = String(raw).trim();
+  try {
+    var url = new URL(v);
+    var code = url.searchParams.get("v");
+    if (code) return code.trim().toUpperCase();
+  } catch(e) {}
+  return v.toUpperCase();
 }
 
 function switchTab(tab, el) {
@@ -346,6 +365,7 @@ function switchTab(tab, el) {
   document.getElementById("sScan").classList.toggle("hidden", tab !== "scan");
   document.getElementById("sHistorique").classList.toggle("hidden", tab !== "historique");
   if (tab === "historique") loadHistorique();
+  if (tab === "scan") focusManualInput();
 }
 
 async function fetchSalarie(code) {
@@ -506,7 +526,9 @@ async function saveBL() {
 }
 
 function verifyManual() {
-  var code = document.getElementById("mi").value.trim().toUpperCase();
+  var raw = document.getElementById("mi").value.trim();
+  if (!raw) return;
+  var code = extractCode(raw);
   if (code) showResult(code);
 }
 
@@ -574,8 +596,7 @@ function scanLoop() {
     var qr = jsQR(img.data,img.width,img.height,{inversionAttempts:"dontInvert"});
     if (qr) {
       scanning = false; stopCam();
-      try { var url = new URL(qr.data); var code = url.searchParams.get("v"); if(code){showResult(code.toUpperCase());return;} } catch(e2) {}
-      showResult(qr.data.trim().toUpperCase());
+      showResult(extractCode(qr.data));
       return;
     }
   }
@@ -597,6 +618,7 @@ function resetScan() {
   document.getElementById("resultSection").style.display = "none";
   document.getElementById("scanSection").style.display = "flex";
   document.getElementById("scanSection").style.flexDirection = "column";
+  focusManualInput();
 }
 
 async function logout() {

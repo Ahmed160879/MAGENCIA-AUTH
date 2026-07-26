@@ -225,7 +225,6 @@ body{font-family:'Inter',sans-serif;background:var(--bg);display:flex;flex-direc
 <script>
 var SUPABASE_URL = "https://rzveghiwbjafmfhrfscb.supabase.co";
 var SUPABASE_KEY = "sb_publishable_Hb6ILSc7bzW_sC6ZD2X7Nw_QP5homkU";
-var FOURNI_URL = "https://ahmed160879.github.io/MAGENCIA-AUTH/fournisseur-supabase_7.html";
 var supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 var currentCode = null;
 var pendingUser = null;
@@ -508,8 +507,8 @@ function showCarte(user) {
 
   var ch = Array.isArray(user.chantiers) ? user.chantiers : [];
   document.getElementById("chList").innerHTML = ch.map(function(c){return '<span class="ch-pill">🏗️ '+c+'</span>';}).join("") || '<span style="color:var(--red);font-size:13px">Aucun chantier autorisé</span>';
-  var url = FOURNI_URL + "?v=" + encodeURIComponent(code);
-  document.getElementById("qrImg").src = "https://api.qrserver.com/v1/create-qr-code/?size=185x185&color=0F1F3D&bgcolor=ffffff&qzone=2&data=" + encodeURIComponent(url);
+  // Le QR encode uniquement le code salarié (lu tel quel côté négociant, caméra ou lecteur USB)
+  document.getElementById("qrImg").src = "https://api.qrserver.com/v1/create-qr-code/?size=185x185&color=0F1F3D&bgcolor=ffffff&qzone=2&data=" + encodeURIComponent(code);
 
   document.getElementById("sLogin").classList.add("hidden");
   document.getElementById("sPin").classList.add("hidden");
