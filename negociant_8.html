@@ -423,6 +423,14 @@ function cancelAutoReset() {
   if (autoResetTimer) { clearTimeout(autoResetTimer); autoResetTimer = null; }
 }
 
+// Détecte les valeurs signifiant "aucune restriction de chantier" saisies côté admin :
+// "Tous", "Tous chantiers", "Tous les chantiers", "Toutes", etc. (tout ce qui commence
+// par "tous"/"toutes"), pour éviter de dépendre d'une formulation exacte.
+function isTousChantiersValue(c) {
+  var v = String(c).trim().toLowerCase();
+  return v.indexOf("tous") === 0 || v.indexOf("toutes") === 0;
+}
+
 // Construit le champ "Référence chantier". Deux cas :
 // - salarié autorisé sur des chantiers précis : liste déroulante strictement limitée
 //   à ces chantiers (aucune saisie libre possible, aucun contournement).
@@ -432,7 +440,7 @@ function renderChantierField(chantiers) {
   var wrap = document.getElementById("chantierFieldWrap");
   if (!wrap) return;
   var list = Array.isArray(chantiers) ? chantiers : [];
-  var isUnrestricted = list.some(function(c){ return String(c).trim().toLowerCase() === "tous chantiers"; });
+  var isUnrestricted = list.some(isTousChantiersValue);
 
   if (isUnrestricted) {
     wrap.innerHTML = '<input class="bl-input" id="chantierInput" type="text" placeholder="Nom du chantier" autocomplete="off" autocorrect="off" spellcheck="false" onfocus="cancelAutoReset()" oninput="document.getElementById(\'chantierErr\').style.display=\'none\'">';
@@ -461,7 +469,7 @@ async function saveBL() {
   // est de toute façon un menu déroulant limité à cette liste). Si le salarié est
   // autorisé sur "Tous chantiers", n'importe quel chantier non vide est accepté.
   var authorized = (window._currentAuthorizedChantiers || []);
-  var isUnrestricted = authorized.some(function(c){ return String(c).trim().toLowerCase() === "tous chantiers"; });
+  var isUnrestricted = authorized.some(isTousChantiersValue);
   if (!chantier || (!isUnrestricted && authorized.indexOf(chantier) === -1)) {
     errEl.style.display = "block";
     return;
