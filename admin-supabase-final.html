@@ -75,6 +75,9 @@ tr:hover td{background:#FAFBFF}
 .btn-tbl.danger{border-color:#FFCDD2;color:var(--red)}
 .tbl-photo{width:32px;height:32px;border-radius:50%;object-fit:cover;vertical-align:middle;border:1.5px solid var(--border)}
 .tbl-photo-placeholder{width:32px;height:32px;border-radius:50%;background:#EEF2FF;display:inline-flex;align-items:center;justify-content:center;font-size:14px;vertical-align:middle;border:1.5px solid var(--border)}
+.filter-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.filter-select{padding:9px 12px;border:2px solid var(--border);border-radius:10px;font-size:13px;color:var(--navy);background:var(--white);min-width:190px}
+.filter-select:focus{outline:none;border-color:var(--gold)}
 
 /* MODAL */
 .modal-bg{position:fixed;inset:0;background:rgba(15,31,61,0.5);display:none;align-items:center;justify-content:center;z-index:100;padding:20px}
@@ -235,6 +238,11 @@ tr:hover td{background:#FAFBFF}
       <div class="section-actions">
         <button class="btn-action btn-outline" onclick="exportCSV('passages')">⬇️ Export CSV</button>
       </div>
+    </div>
+    <div class="filter-row">
+      <select class="filter-select" id="filterSalarie" onchange="renderAll()">
+        <option value="all">Isoler un salarié — tous</option>
+      </select>
     </div>
     <table>
       <thead><tr><th>Date / Heure</th><th>Code</th><th>Salarié</th><th>Agence</th><th>Chantier</th><th>Bon de livraison</th><th>Résultat</th></tr></thead>
@@ -621,15 +629,55 @@ async function loadData() {
     if (perr) throw perr;
     passages = Array.isArray(pdata) ? pdata : [];
   } catch(e) { passages = []; }
+  populatePassageFilters();
   renderAll();
 }
 
+// ── FILTRE HISTORIQUE (isoler un salarié) + vérification des BL ──
+function populatePassageFilters() {
+  var salarieSel = document.getElementById("filterSalarie");
+  if (!salarieSel) return;
+  var namesMap = {};
+  passages.forEach(function(p) {
+    if (p.code_salarie) namesMap[p.code_salarie] = p.nom_salarie || p.code_salarie;
+  });
+  var codes = Object.keys(namesMap).sort(function(a,b){ return String(namesMap[a]).localeCompare(String(namesMap[b])); });
+  var prevSalarie = salarieSel.value || "all";
+  salarieSel.innerHTML = '<option value="all">Isoler un salarié — tous</option>' +
+    codes.map(function(c){
+      var esc = String(namesMap[c]).replace(/&/g,"&amp;").replace(/</g,"&lt;");
+      return '<option value="'+c+'">'+esc+' ('+c+')</option>';
+    }).join("");
+  salarieSel.value = (codes.indexOf(prevSalarie) !== -1) ? prevSalarie : "all";
+}
+
+function getFilteredPassages() {
+  var salarieSel = document.getElementById("filterSalarie");
+  var salarie = salarieSel ? salarieSel.value : "all";
+  if (salarie === "all") return passages;
+  return passages.filter(function(p) { return p.code_salarie === salarie; });
+}
+
+// Compte les occurrences de chaque n° de BL sur l'ensemble des passages chargés
+// (pas seulement le sous-ensemble filtré) pour repérer un BL réutilisé par erreur ou en fraude.
+function getBLCounts() {
+  var counts = {};
+  passages.forEach(function(p) {
+    if (p.bon_livraison) {
+      var key = String(p.bon_livraison).trim().toUpperCase();
+      counts[key] = (counts[key] || 0) + 1;
+    }
+  });
+  return counts;
+}
+
 function renderAll() {
+  var filteredPassages = getFilteredPassages();
   var actifs = salaries.filter(function(s){return s.statut==="ACTIF";}).length;
-  var ok = passages.filter(function(p){return p.resultat==="AUTORISE";}).length;
-  var ko = passages.filter(function(p){return p.resultat==="REFUSE";}).length;
+  var ok = filteredPassages.filter(function(p){return p.resultat==="AUTORISE";}).length;
+  var ko = filteredPassages.filter(function(p){return p.resultat==="REFUSE";}).length;
   document.getElementById("kpiSal").textContent = actifs;
-  document.getElementById("kpiPass").textContent = passages.length;
+  document.getElementById("kpiPass").textContent = filteredPassages.length;
   document.getElementById("kpiOk").textContent = ok;
   document.getElementById("kpiKo").textContent = ko;
 
@@ -667,18 +715,25 @@ function renderAll() {
 
   // Table passages
   var pb = document.getElementById("passagesBody");
-  if (passages.length === 0) {
-    pb.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:24px">Aucun passage enregistré</td></tr>';
+  var blCounts = getBLCounts();
+  if (filteredPassages.length === 0) {
+    pb.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:24px">Aucun passage pour ce salarié</td></tr>';
   } else {
-    pb.innerHTML = passages.map(function(p) {
+    pb.innerHTML = filteredPassages.map(function(p) {
       var d = p.created_at ? new Date(p.created_at).toLocaleString("fr-FR") : "—";
+      var blKey = p.bon_livraison ? String(p.bon_livraison).trim().toUpperCase() : "";
+      var isDup = blKey && blCounts[blKey] > 1;
+      var blCell = p.bon_livraison
+        ? '<span style="font-family:monospace;font-size:11px;font-weight:700;background:'+(isDup?"#FDEDED":"#FFF8EC")+';color:'+(isDup?"#C62828":"#B45309")+';padding:3px 8px;border-radius:6px">'+p.bon_livraison+'</span>'
+          + (isDup ? '<div style="font-size:10px;color:#C62828;font-weight:700;margin-top:2px">⚠️ utilisé '+blCounts[blKey]+'x</div>' : '')
+        : '<span style="color:var(--muted);font-size:11px">—</span>';
       return '<tr>'+
         '<td style="font-size:12px">'+d+'</td>'+
         '<td><code style="font-size:11px;font-weight:700">'+p.code_salarie+'</code></td>'+
         '<td>'+p.nom_salarie+'</td>'+
         '<td>'+p.agence+'</td>'+
         '<td>'+(p.chantier?'<span style="font-size:12px;font-weight:600;color:var(--navy)">🏗️ '+p.chantier+'</span>':'<span style="color:var(--muted);font-size:11px">—</span>')+'</td>'+
-        '<td>'+(p.bon_livraison?'<span style="font-family:monospace;font-size:11px;font-weight:700;background:#FFF8EC;color:#B45309;padding:3px 8px;border-radius:6px">'+p.bon_livraison+'</span>':'<span style="color:var(--muted);font-size:11px">—</span>')+'</td>'+
+        '<td>'+blCell+'</td>'+
         '<td><span class="pill '+(p.resultat==="AUTORISE"?"pill-green":"pill-red")+'">'+p.resultat+'</span></td>'+
       '</tr>';
     }).join("");
@@ -814,7 +869,7 @@ function showQRInModal(code) {
 
 // ── EXPORT ──
 function exportCSV(type) {
-  var data = type === "salaries" ? salaries : passages;
+  var data = type === "salaries" ? salaries : getFilteredPassages();
   if (!data.length) { alert("Aucune donnée à exporter"); return; }
   var keys = Object.keys(data[0]);
   var rows = [keys];
