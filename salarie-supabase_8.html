@@ -89,6 +89,25 @@ body{font-family:'Inter',sans-serif;background:var(--bg);display:flex;flex-direc
 .bl-empty-icon{font-size:40px;margin-bottom:8px}
 .btn-refresh{background:transparent;border:1.5px solid var(--border);padding:4px 10px;border-radius:8px;font-size:11px;font-weight:700;color:var(--muted);cursor:pointer}
 .btn-out{width:100%;padding:14px;background:transparent;color:var(--muted);border:1.5px solid var(--border);border-radius:14px;font-size:14px;font-weight:600;cursor:pointer}
+
+/* DEMANDE */
+#sDemande{padding:14px;gap:12px}
+.dmd-card{background:var(--white);border-radius:18px;padding:16px;box-shadow:var(--shadow)}
+.dmd-lbl{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1.2px;margin-bottom:7px;display:block;margin-top:14px}
+.dmd-lbl:first-child{margin-top:0}
+.dmd-in{width:100%;padding:12px 14px;border:2px solid var(--border);border-radius:12px;font-size:14px;color:var(--navy);background:var(--white);-webkit-appearance:none;font-family:inherit}
+.dmd-in:focus{outline:none;border-color:var(--gold)}
+textarea.dmd-in{resize:none;min-height:80px}
+.dmd-ok{background:#EDFBF3;color:#0CAF60;border-radius:12px;padding:11px 15px;font-size:13px;margin-top:12px;display:none;font-weight:600}
+.dmd-item{padding:11px 0;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:3px}
+.dmd-item:last-child{border-bottom:none}
+.dmd-item-top{display:flex;align-items:center;justify-content:space-between}
+.dmd-item-agence{font-size:13px;font-weight:700;color:var(--navy)}
+.dmd-item-statut{font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;text-transform:uppercase}
+.dmd-item-statut.nouvelle{background:#FFF8EC;color:#B45309}
+.dmd-item-statut.traitee{background:var(--green-bg,#EDFBF3);color:var(--green)}
+.dmd-item-msg{font-size:12px;color:#374151}
+.dmd-item-meta{font-size:11px;color:var(--muted)}
 </style>
 </head>
 <body>
@@ -155,6 +174,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);display:flex;flex-direc
   <div class="tabs">
     <button class="tab active" onclick="switchTab('carte',this)">🪪 Ma carte</button>
     <button class="tab" onclick="switchTab('bl',this)">📋 Mes BL</button>
+    <button class="tab" onclick="switchTab('demande',this)">📤 Demande</button>
   </div>
 </div>
 
@@ -216,6 +236,33 @@ body{font-family:'Inter',sans-serif;background:var(--bg);display:flex;flex-direc
     <div id="blList">
       <div class="bl-empty"><div class="bl-empty-icon">⏳</div>Chargement...</div>
     </div>
+  </div>
+  <button class="btn-out" onclick="out()">← Déconnexion</button>
+</div>
+
+<!-- DEMANDE À UN NÉGOCIANT -->
+<div class="screen hidden" id="sDemande">
+  <div class="dmd-card">
+    <label class="dmd-lbl">Négociant</label>
+    <select class="dmd-in" id="dmdAgence">
+      <option value="">Chargement...</option>
+    </select>
+    <label class="dmd-lbl">Chantier concerné</label>
+    <select class="dmd-in" id="dmdChantier">
+      <option value="">—</option>
+    </select>
+    <label class="dmd-lbl">Votre demande</label>
+    <textarea class="dmd-in" id="dmdMessage" placeholder="Ex: 10 sacs de ciment, palette de parpaings"></textarea>
+    <button class="btn" style="margin-top:14px" onclick="sendDemande()">Envoyer la demande →</button>
+    <div class="dmd-ok" id="dmdOk">✅ Demande envoyée au négociant</div>
+    <div class="err" id="dmdErr" style="margin-top:10px"></div>
+  </div>
+  <div class="bl-list-card">
+    <div class="bl-list-title">
+      📤 Mes demandes envoyées
+      <button class="btn-refresh" onclick="loadMesDemandes()">↻</button>
+    </div>
+    <div id="dmdList"><div style="text-align:center;padding:24px;color:var(--muted)">⏳ Chargement...</div></div>
   </div>
   <button class="btn-out" onclick="out()">← Déconnexion</button>
 </div>
@@ -286,7 +333,110 @@ function switchTab(tab, el) {
   el.classList.add("active");
   document.getElementById("sCarte").classList.toggle("hidden", tab !== "carte");
   document.getElementById("sBL").classList.toggle("hidden", tab !== "bl");
+  document.getElementById("sDemande").classList.toggle("hidden", tab !== "demande");
   if (tab === "bl") loadBL();
+  if (tab === "demande") openDemandeTab();
+}
+
+var currentUser = null;
+
+async function openDemandeTab() {
+  document.getElementById("dmdOk").style.display = "none";
+  document.getElementById("dmdErr").style.display = "none";
+  populateDemandeChantiers();
+  await populateDemandeAgences();
+  await loadMesDemandes();
+}
+
+function populateDemandeChantiers() {
+  var sel = document.getElementById("dmdChantier");
+  var ch = (currentUser && Array.isArray(currentUser.chantiers)) ? currentUser.chantiers : [];
+  if (ch.length === 0) {
+    sel.innerHTML = '<option value="">Aucun chantier autorisé</option>';
+    return;
+  }
+  sel.innerHTML = ch.map(function(c){
+    var esc = String(c).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;");
+    return '<option value="'+esc+'">'+esc+'</option>';
+  }).join("");
+}
+
+async function populateDemandeAgences() {
+  var sel = document.getElementById("dmdAgence");
+  try {
+    var { data, error } = await supabase.rpc('list_negociant_agences');
+    if (error) throw error;
+    var agences = Array.isArray(data) ? data.map(function(r){ return r.agence; }) : [];
+    if (agences.length === 0) {
+      sel.innerHTML = '<option value="">Aucune agence disponible</option>';
+      return;
+    }
+    sel.innerHTML = agences.map(function(a){
+      var esc = String(a).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;");
+      return '<option value="'+esc+'">'+esc+'</option>';
+    }).join("");
+  } catch(e) {
+    console.error("populateDemandeAgences error", e);
+    sel.innerHTML = '<option value="">Erreur de chargement</option>';
+  }
+}
+
+async function sendDemande() {
+  var agence = document.getElementById("dmdAgence").value;
+  var chantier = document.getElementById("dmdChantier").value;
+  var message = document.getElementById("dmdMessage").value.trim();
+  var errEl = document.getElementById("dmdErr");
+  var okEl = document.getElementById("dmdOk");
+  errEl.style.display = "none";
+  okEl.style.display = "none";
+  if (!agence) { errEl.textContent = "❌ Choisissez un négociant"; errEl.style.display = "block"; return; }
+  if (!message) { errEl.textContent = "❌ Décrivez votre demande"; errEl.style.display = "block"; return; }
+  try {
+    var { error } = await supabase.rpc('create_demande', {
+      p_code_salarie: currentCode,
+      p_nom_salarie: currentUser ? currentUser.nom : currentCode,
+      p_chantier: chantier || null,
+      p_agence_cible: agence,
+      p_message: message
+    });
+    if (error) throw error;
+    document.getElementById("dmdMessage").value = "";
+    okEl.style.display = "block";
+    await loadMesDemandes();
+  } catch(e) {
+    console.error("sendDemande error", e);
+    errEl.textContent = "❌ Échec de l'envoi, réessayez";
+    errEl.style.display = "block";
+  }
+}
+
+async function loadMesDemandes() {
+  if (!currentCode) return;
+  var list = document.getElementById("dmdList");
+  list.innerHTML = '<div style="text-align:center;padding:24px;color:var(--muted)">⏳ Chargement...</div>';
+  try {
+    var { data, error } = await supabase.rpc('get_demandes_by_salarie', { p_code: currentCode });
+    if (error) throw error;
+    var demandes = Array.isArray(data) ? data : [];
+    if (demandes.length === 0) {
+      list.innerHTML = '<div style="text-align:center;padding:24px;color:var(--muted)">Aucune demande envoyée</div>';
+      return;
+    }
+    list.innerHTML = demandes.map(function(d) {
+      var date = d.created_at ? new Date(d.created_at).toLocaleString("fr-FR") : "—";
+      return '<div class="dmd-item">'+
+        '<div class="dmd-item-top">'+
+          '<div class="dmd-item-agence">🏪 '+d.agence_cible+'</div>'+
+          '<div class="dmd-item-statut '+d.statut+'">'+(d.statut==="traitee"?"Traitée":"Nouvelle")+'</div>'+
+        '</div>'+
+        '<div class="dmd-item-msg">'+d.message+'</div>'+
+        '<div class="dmd-item-meta">'+date+(d.chantier?' · 🏗️ '+d.chantier:'')+'</div>'+
+      '</div>';
+    }).join("");
+  } catch(e) {
+    console.error("loadMesDemandes error", e);
+    list.innerHTML = '<div style="text-align:center;padding:24px;color:var(--muted)">⚠️ Erreur de chargement</div>';
+  }
 }
 
 async function login() {
@@ -482,6 +632,7 @@ async function submitPin() {
 }
 
 function showCarte(user) {
+  currentUser = user;
   var code = currentCode;
   var prefix = code.split("-")[0];
   var companyNames = {"MAG":"MAGENCIA","EXT":"Sous-traitant","ATL":"ATLAS","MAR":"BTP Martin SAS"};
@@ -520,6 +671,7 @@ function showCarte(user) {
 function out() {
   currentCode = null;
   pendingUser = null;
+  currentUser = null;
   pinMode = null;
   document.getElementById("codeIn").value = "";
   document.getElementById("sLogin").classList.remove("hidden");
@@ -528,6 +680,7 @@ function out() {
   document.getElementById("tabBar").classList.add("hidden");
   document.getElementById("sCarte").classList.add("hidden");
   document.getElementById("sBL").classList.add("hidden");
+  document.getElementById("sDemande").classList.add("hidden");
 }
 </script>
 </body>

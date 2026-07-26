@@ -125,6 +125,19 @@ body{font-family:'Inter',sans-serif;background:var(--bg);display:flex;flex-direc
 .kpi-mini-lbl{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px}
 .btn-out{width:100%;padding:14px;background:transparent;color:var(--muted);border:1.5px solid var(--border);border-radius:14px;font-size:14px;font-weight:600;cursor:pointer}
 
+/* DEMANDES REÇUES */
+#sDemandesNego{padding:14px;gap:12px}
+.dmn-item{padding:12px 0;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:5px}
+.dmn-item:last-child{border-bottom:none}
+.dmn-top{display:flex;align-items:center;justify-content:space-between}
+.dmn-salarie{font-size:13px;font-weight:700;color:var(--navy)}
+.dmn-statut{font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;text-transform:uppercase}
+.dmn-statut.nouvelle{background:#FFF8EC;color:#B45309}
+.dmn-statut.traitee{background:var(--green-bg);color:var(--green)}
+.dmn-msg{font-size:13px;color:#374151;font-weight:600}
+.dmn-meta{font-size:11px;color:var(--muted)}
+.dmn-btn{align-self:flex-start;margin-top:2px;padding:6px 12px;border:1.5px solid var(--border);background:transparent;border-radius:8px;font-size:11px;font-weight:700;color:var(--navy);cursor:pointer}
+
 /* ÉCRAN LARGE (ordinateur / tablette) */
 @media (min-width:900px){
   html,body{overflow:auto}
@@ -167,6 +180,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);display:flex;flex-direc
   <div class="tabs">
     <button class="tab active" onclick="switchTab('scan',this)">📷 Scanner</button>
     <button class="tab" onclick="switchTab('historique',this)">📋 Historique</button>
+    <button class="tab" onclick="switchTab('demandes',this)">📥 Demandes</button>
   </div>
 </div>
 
@@ -262,6 +276,20 @@ body{font-family:'Inter',sans-serif;background:var(--bg);display:flex;flex-direc
         <button class="btn-refresh" onclick="loadHistorique()">↻</button>
       </div>
       <div id="histoList"><div style="text-align:center;padding:24px;color:var(--muted)">⏳ Chargement...</div></div>
+    </div>
+    <button class="btn-out" onclick="logout()">← Déconnexion</button>
+  </div>
+</div>
+
+<!-- DEMANDES REÇUES -->
+<div class="screen hidden" id="sDemandesNego">
+  <div style="padding:14px;gap:12px;display:flex;flex-direction:column">
+    <div class="histo-card">
+      <div class="histo-title">
+        Demandes de mes clients
+        <button class="btn-refresh" onclick="loadDemandesNego()">↻</button>
+      </div>
+      <div id="demandesList"><div style="text-align:center;padding:24px;color:var(--muted)">⏳ Chargement...</div></div>
     </div>
     <button class="btn-out" onclick="logout()">← Déconnexion</button>
   </div>
@@ -364,8 +392,48 @@ function switchTab(tab, el) {
   el.classList.add("active");
   document.getElementById("sScan").classList.toggle("hidden", tab !== "scan");
   document.getElementById("sHistorique").classList.toggle("hidden", tab !== "historique");
+  document.getElementById("sDemandesNego").classList.toggle("hidden", tab !== "demandes");
   if (tab === "historique") loadHistorique();
+  if (tab === "demandes") loadDemandesNego();
   if (tab === "scan") focusManualInput();
+}
+
+async function loadDemandesNego() {
+  var list = document.getElementById("demandesList");
+  list.innerHTML = '<div style="text-align:center;padding:24px;color:var(--muted)">⏳ Chargement...</div>';
+  try {
+    var { data, error } = await supabase.rpc('get_demandes_for_my_agence');
+    if (error) throw error;
+    var demandes = Array.isArray(data) ? data : [];
+    if (demandes.length === 0) {
+      list.innerHTML = '<div style="text-align:center;padding:24px;color:var(--muted)">📭 Aucune demande reçue</div>';
+      return;
+    }
+    list.innerHTML = demandes.map(function(d) {
+      var date = d.created_at ? new Date(d.created_at).toLocaleDateString("fr-FR") + " " + new Date(d.created_at).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"}) : "—";
+      var traitee = d.statut === "traitee";
+      return '<div class="dmn-item">'+
+        '<div class="dmn-top">'+
+          '<div class="dmn-salarie">'+(d.nom_salarie||d.code_salarie)+'</div>'+
+          '<div class="dmn-statut '+(traitee?"traitee":"nouvelle")+'">'+(traitee?"Traitée":"Nouvelle")+'</div>'+
+        '</div>'+
+        '<div class="dmn-msg">'+d.message+'</div>'+
+        '<div class="dmn-meta">'+date+(d.chantier?' · 🏗️ '+d.chantier:'')+' · '+d.code_salarie+'</div>'+
+        (traitee ? '' : '<button class="dmn-btn" onclick="markDemandeTraiteeNego('+d.id+')">✓ Marquer traitée</button>')+
+      '</div>';
+    }).join("");
+  } catch(e) {
+    console.error("loadDemandesNego error", e);
+    list.innerHTML = '<div style="text-align:center;padding:24px;color:var(--muted)">⚠️ Erreur de chargement</div>';
+  }
+}
+
+async function markDemandeTraiteeNego(id) {
+  try {
+    var { error } = await supabase.rpc('mark_demande_traitee', { p_id: id });
+    if (error) throw error;
+  } catch(e) { console.error("markDemandeTraiteeNego error", e); }
+  loadDemandesNego();
 }
 
 async function fetchSalarie(code) {
@@ -628,6 +696,7 @@ async function logout() {
   document.getElementById("tabBar").classList.add("hidden");
   document.getElementById("sScan").classList.add("hidden");
   document.getElementById("sHistorique").classList.add("hidden");
+  document.getElementById("sDemandesNego").classList.add("hidden");
   document.getElementById("sLogin").classList.remove("hidden");
   await supabase.auth.signOut();
 }
