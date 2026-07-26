@@ -423,13 +423,21 @@ function cancelAutoReset() {
   if (autoResetTimer) { clearTimeout(autoResetTimer); autoResetTimer = null; }
 }
 
-// Construit le champ "Référence chantier" : liste déroulante strictement limitée
-// aux chantiers autorisés du salarié — aucune exception, aucune saisie libre.
-// Empêche physiquement de choisir/valider un chantier non autorisé.
+// Construit le champ "Référence chantier". Deux cas :
+// - salarié autorisé sur des chantiers précis : liste déroulante strictement limitée
+//   à ces chantiers (aucune saisie libre possible, aucun contournement).
+// - salarié autorisé sur "Tous chantiers" : le champ reste une saisie libre
+//   (mais toujours obligatoire, voir saveBL), car il n'y a pas de liste fixe à proposer.
 function renderChantierField(chantiers) {
   var wrap = document.getElementById("chantierFieldWrap");
   if (!wrap) return;
   var list = Array.isArray(chantiers) ? chantiers : [];
+  var isUnrestricted = list.some(function(c){ return String(c).trim().toLowerCase() === "tous chantiers"; });
+
+  if (isUnrestricted) {
+    wrap.innerHTML = '<input class="bl-input" id="chantierInput" type="text" placeholder="Nom du chantier" autocomplete="off" autocorrect="off" spellcheck="false" onfocus="cancelAutoReset()" oninput="document.getElementById(\'chantierErr\').style.display=\'none\'">';
+    return;
+  }
   if (list.length === 0) {
     wrap.innerHTML = '<select class="bl-input" id="chantierInput" disabled style="letter-spacing:0;text-transform:none;opacity:0.5"><option value="">Aucun chantier autorisé</option></select>';
     return;
@@ -448,11 +456,13 @@ async function saveBL() {
   errEl.style.display = "none";
 
   // Le chantier est désormais obligatoire : impossible de valider un retrait sans
-  // préciser (et faire valider) le chantier concerné parmi les chantiers autorisés
-  // du salarié — c'est ce qui garantit qu'il ne prend de la marchandise que sur un
-  // chantier pour lequel il est réellement autorisé.
+  // préciser (et faire valider) le chantier concerné. Si le salarié est autorisé sur
+  // des chantiers précis, la valeur doit exactement correspondre à l'un d'eux (le champ
+  // est de toute façon un menu déroulant limité à cette liste). Si le salarié est
+  // autorisé sur "Tous chantiers", n'importe quel chantier non vide est accepté.
   var authorized = (window._currentAuthorizedChantiers || []);
-  if (!chantier || authorized.indexOf(chantier) === -1) {
+  var isUnrestricted = authorized.some(function(c){ return String(c).trim().toLowerCase() === "tous chantiers"; });
+  if (!chantier || (!isUnrestricted && authorized.indexOf(chantier) === -1)) {
     errEl.style.display = "block";
     return;
   }
