@@ -72,6 +72,8 @@ tr:hover td{background:#FAFBFF}
 .pill-gold{background:#FFF8EC;color:#B45309}
 .btn-tbl{padding:4px 10px;border:1.5px solid var(--border);background:transparent;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;color:var(--navy);margin-right:4px}
 .btn-tbl.danger{border-color:#FFCDD2;color:var(--red)}
+.tbl-photo{width:32px;height:32px;border-radius:50%;object-fit:cover;vertical-align:middle;border:1.5px solid var(--border)}
+.tbl-photo-placeholder{width:32px;height:32px;border-radius:50%;background:#EEF2FF;display:inline-flex;align-items:center;justify-content:center;font-size:14px;vertical-align:middle;border:1.5px solid var(--border)}
 
 /* MODAL */
 .modal-bg{position:fixed;inset:0;background:rgba(15,31,61,0.5);display:none;align-items:center;justify-content:center;z-index:100;padding:20px}
@@ -85,6 +87,13 @@ tr:hover td{background:#FAFBFF}
 .qr-preview{text-align:center;margin-top:16px;padding:16px;background:var(--bg);border-radius:12px}
 .qr-preview img{width:150px;height:150px;border-radius:8px}
 .qr-preview p{font-size:12px;color:var(--muted);margin-top:8px}
+
+.photo-row{display:flex;align-items:center;gap:12px}
+.photo-preview-wrap{width:56px;height:56px;border-radius:50%;background:#EEF2FF;display:flex;align-items:center;justify-content:center;overflow:hidden;border:2px solid var(--border);flex-shrink:0}
+.photo-preview-wrap img{width:100%;height:100%;object-fit:cover;display:none}
+.photo-actions{flex:1}
+.photo-actions input[type=file]{font-size:12px;max-width:100%}
+.photo-remove-link{font-size:11px;margin-top:6px;display:inline-block}
 
 @media(max-width:768px){
   .kpi-grid{grid-template-columns:repeat(2,1fr)}
@@ -213,8 +222,8 @@ tr:hover td{background:#FAFBFF}
       </div>
     </div>
     <table>
-      <thead><tr><th>Code</th><th>Nom</th><th>Poste</th><th>Type</th><th>Statut</th><th>Chantiers autorisés</th><th>QR</th><th>Actions</th></tr></thead>
-      <tbody id="salariesBody"><tr><td colspan="8" style="text-align:center;color:var(--muted);padding:24px">⏳ Chargement...</td></tr></tbody>
+      <thead><tr><th>Photo</th><th>Code</th><th>Nom</th><th>Poste</th><th>Type</th><th>Statut</th><th>Chantiers autorisés</th><th>QR</th><th>Actions</th></tr></thead>
+      <tbody id="salariesBody"><tr><td colspan="9" style="text-align:center;color:var(--muted);padding:24px">⏳ Chargement...</td></tr></tbody>
     </table>
   </div>
 
@@ -238,6 +247,19 @@ tr:hover td{background:#FAFBFF}
   <div class="modal">
     <div class="modal-title" id="modalSalTitle">Ajouter un salarié</div>
     <input type="hidden" id="salEditId">
+    <div class="form-group">
+      <label class="form-lbl">Photo <span style="text-transform:none;font-weight:500;color:var(--muted)">(gérée uniquement par l'admin)</span></label>
+      <div class="photo-row">
+        <div class="photo-preview-wrap" id="salPhotoPreviewWrap">
+          <span id="salPhotoEmoji" style="font-size:22px">👤</span>
+          <img id="salPhotoPreview" src="" alt="">
+        </div>
+        <div class="photo-actions">
+          <input type="file" id="salPhotoInput" accept="image/*" onchange="loadSalPhoto(this)">
+          <div><span class="login-link photo-remove-link" onclick="removeSalPhoto()">🗑️ Retirer la photo</span></div>
+        </div>
+      </div>
+    </div>
     <div class="form-group">
       <label class="form-lbl">Code unique</label>
       <input class="form-in" id="salCode" type="text" placeholder="MAG-XXXXXX" style="font-family:monospace;letter-spacing:2px;text-transform:uppercase">
@@ -316,6 +338,7 @@ var COMPANIES = [];
 var currentCompany = null;
 var salaries = [];
 var passages = [];
+var salPhotoData = null;
 
 // ── AUTH ──
 var supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -578,11 +601,15 @@ function renderAll() {
   // Table salariés
   var sb = document.getElementById("salariesBody");
   if (salaries.length === 0) {
-    sb.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:24px">Aucun salarié — cliquez sur "+ Ajouter"</td></tr>';
+    sb.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:24px">Aucun salarié — cliquez sur "+ Ajouter"</td></tr>';
   } else {
     sb.innerHTML = salaries.map(function(s) {
       var ch = Array.isArray(s.chantiers) ? s.chantiers : [];
+      var photoCell = s.photo
+        ? '<img class="tbl-photo" src="'+s.photo+'" alt="">'
+        : '<span class="tbl-photo-placeholder">👤</span>';
       return '<tr>'+
+        '<td>'+photoCell+'</td>'+
         '<td><code style="font-size:11px;font-weight:700;color:var(--navy)">'+s.code+'</code></td>'+
         '<td><strong>'+s.nom+'</strong></td>'+
         '<td>'+s.poste+'</td>'+
@@ -633,6 +660,9 @@ function openAddSalarie() {
   document.getElementById("salStatut").value = "ACTIF";
   document.getElementById("salChantiers").value = "";
   document.getElementById("qrPreview").style.display = "none";
+  salPhotoData = null;
+  document.getElementById("salPhotoInput").value = "";
+  showSalPhotoPreview(null);
   document.getElementById("modalSalarie").classList.add("open");
 }
 
@@ -648,8 +678,46 @@ function editSalarie(code) {
   document.getElementById("salType").value = s.type;
   document.getElementById("salStatut").value = s.statut;
   document.getElementById("salChantiers").value = (s.chantiers||[]).join(", ");
+  salPhotoData = s.photo || null;
+  document.getElementById("salPhotoInput").value = "";
+  showSalPhotoPreview(salPhotoData);
   showQRInModal(s.code);
   document.getElementById("modalSalarie").classList.add("open");
+}
+
+function loadSalPhoto(input) {
+  var file = input.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var img = new Image();
+    img.onload = function() {
+      var maxSize = 300;
+      var scale = Math.min(1, maxSize / Math.max(img.width, img.height));
+      var canvas = document.createElement("canvas");
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      var ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      salPhotoData = canvas.toDataURL("image/jpeg", 0.75);
+      showSalPhotoPreview(salPhotoData);
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function showSalPhotoPreview(photo) {
+  var img = document.getElementById("salPhotoPreview");
+  var emoji = document.getElementById("salPhotoEmoji");
+  if (photo) { img.src = photo; img.style.display = "block"; emoji.style.display = "none"; }
+  else { img.style.display = "none"; emoji.style.display = "block"; }
+}
+
+function removeSalPhoto() {
+  salPhotoData = null;
+  document.getElementById("salPhotoInput").value = "";
+  showSalPhotoPreview(null);
 }
 
 async function saveSalarie() {
@@ -660,11 +728,11 @@ async function saveSalarie() {
   var statut = document.getElementById("salStatut").value;
   var chantiers = document.getElementById("salChantiers").value.split(",").map(function(c){return c.trim();}).filter(Boolean);
   if (!code || !nom) { alert("Code et nom obligatoires"); return; }
-  var data = {code:code, nom:nom, poste:poste, type:type, statut:statut, chantiers:chantiers};
+  var data = {code:code, nom:nom, poste:poste, type:type, statut:statut, chantiers:chantiers, photo:salPhotoData};
   try {
     var isEdit = document.getElementById("salEditId").value;
     if (isEdit) {
-      var { error } = await supabase.from('salaries').update({nom:nom,poste:poste,type:type,statut:statut,chantiers:chantiers}).eq('code', code);
+      var { error } = await supabase.from('salaries').update({nom:nom,poste:poste,type:type,statut:statut,chantiers:chantiers,photo:salPhotoData}).eq('code', code);
       if (error) { console.error("saveSalarie update failed", error); alert("❌ Échec de la modification :\n" + error.message); return; }
     } else {
       var { error: error2 } = await supabase.from('salaries').insert(data);
