@@ -207,9 +207,10 @@ body{font-family:'Inter',sans-serif;background:var(--bg);display:flex;flex-direc
       </div>
       <div style="margin-top:10px">
         <div style="font-size:10px;font-weight:700;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:6px">🏗️ Référence chantier</div>
-        <div class="bl-row">
+        <div class="bl-row" id="chantierFieldWrap">
           <input class="bl-input" id="chantierInput" type="text" placeholder="Nom du chantier" autocomplete="off" autocorrect="off" spellcheck="false" onfocus="cancelAutoReset()">
         </div>
+        <div class="err" id="chantierErr" style="display:none;margin-top:8px;max-width:none">❌ Ce chantier n'est pas autorisé pour ce salarié</div>
       </div>
       <div class="bl-saved" id="blSaved">
         <div style="font-size:16px">✅</div>
@@ -401,7 +402,9 @@ async function showResult(code) {
 
   document.getElementById("blCard").style.display = ok ? "block" : "none";
   document.getElementById("blInput").value = "";
-  document.getElementById("chantierInput").value = "";
+  window._currentAuthorizedChantiers = (user && Array.isArray(user.chantiers)) ? user.chantiers : [];
+  renderChantierField(window._currentAuthorizedChantiers);
+  document.getElementById("chantierErr").style.display = "none";
   document.getElementById("blSaved").style.display = "none";
   document.getElementById("savedInfo").textContent = currentNego + " · " + code;
 
@@ -418,9 +421,42 @@ function cancelAutoReset() {
   if (autoResetTimer) { clearTimeout(autoResetTimer); autoResetTimer = null; }
 }
 
+// Construit le champ "Référence chantier" : liste déroulante limitée aux chantiers
+// autorisés du salarié (empêche de saisir/valider un chantier non autorisé), sauf
+// si le salarié est autorisé sur "Tous chantiers", auquel cas la saisie reste libre.
+function renderChantierField(chantiers) {
+  var wrap = document.getElementById("chantierFieldWrap");
+  if (!wrap) return;
+  var list = Array.isArray(chantiers) ? chantiers : [];
+  var isUnrestricted = list.some(function(c){ return String(c).trim().toLowerCase() === "tous chantiers"; });
+  if (isUnrestricted || list.length === 0) {
+    wrap.innerHTML = '<input class="bl-input" id="chantierInput" type="text" placeholder="Nom du chantier" autocomplete="off" autocorrect="off" spellcheck="false" onfocus="cancelAutoReset()">';
+  } else {
+    var options = '<option value="">— Choisir le chantier —</option>' + list.map(function(c) {
+      var esc = String(c).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;");
+      return '<option value="'+esc+'">'+esc+'</option>';
+    }).join("");
+    wrap.innerHTML = '<select class="bl-input" id="chantierInput" onfocus="cancelAutoReset()" onchange="cancelAutoReset();document.getElementById(\'chantierErr\').style.display=\'none\'" style="letter-spacing:0;text-transform:none">'+options+'</select>';
+  }
+}
+
 async function saveBL() {
   var bl = document.getElementById("blInput").value.trim().toUpperCase();
   var chantier = document.getElementById("chantierInput").value.trim();
+  var errEl = document.getElementById("chantierErr");
+  errEl.style.display = "none";
+
+  // Sécurité : si un chantier est renseigné, il doit faire partie des chantiers
+  // autorisés affichés plus haut (sauf salarié autorisé sur "Tous chantiers").
+  if (chantier) {
+    var authorized = (window._currentAuthorizedChantiers || []);
+    var isUnrestricted = authorized.some(function(c){ return String(c).trim().toLowerCase() === "tous chantiers"; });
+    if (!isUnrestricted && authorized.length > 0 && authorized.indexOf(chantier) === -1) {
+      errEl.style.display = "block";
+      return;
+    }
+  }
+
   if (!bl && !chantier) return;
   var body = {};
   if (bl) body.bon_livraison = bl;
