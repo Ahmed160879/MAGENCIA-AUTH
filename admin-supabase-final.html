@@ -440,6 +440,7 @@ async function logout() {
   var pwdEl = document.getElementById("loginPwd");
   if (emailEl) emailEl.value = "";
   if (pwdEl) pwdEl.value = "";
+  unsubscribeRealtime();
   await supabase.auth.signOut();
 }
 
@@ -520,6 +521,39 @@ function selectCompany(company) {
   var tab = document.getElementById("tab-"+company.id);
   if (tab) tab.classList.add("active");
   loadData();
+  subscribeToPassages();
+}
+
+// ── TEMPS RÉEL ──
+var realtimeChannel = null;
+var realtimeReloadTimer = null;
+
+function subscribeToPassages() {
+  if (realtimeChannel) {
+    supabase.removeChannel(realtimeChannel);
+    realtimeChannel = null;
+  }
+  realtimeChannel = supabase.channel('passages-realtime-' + Date.now())
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'passages' }, function() {
+      scheduleRealtimeReload();
+    })
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'passages' }, function() {
+      scheduleRealtimeReload();
+    })
+    .subscribe();
+}
+
+function scheduleRealtimeReload() {
+  // Petit debounce pour éviter les rechargements multiples si plusieurs scans arrivent d'un coup
+  if (realtimeReloadTimer) clearTimeout(realtimeReloadTimer);
+  realtimeReloadTimer = setTimeout(function() { loadData(); }, 400);
+}
+
+function unsubscribeRealtime() {
+  if (realtimeChannel) {
+    supabase.removeChannel(realtimeChannel);
+    realtimeChannel = null;
+  }
 }
 
 function openAddCompany() {
