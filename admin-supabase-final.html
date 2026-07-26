@@ -70,6 +70,7 @@ tr:hover td{background:#FAFBFF}
 .pill-red{background:#FFF0F0;color:var(--red)}
 .pill-blue{background:#EEF2FF;color:var(--navy)}
 .pill-gold{background:#FFF8EC;color:#B45309}
+.pill-purple{background:#F3E8FF;color:#7C3AED}
 .btn-tbl{padding:4px 10px;border:1.5px solid var(--border);background:transparent;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;color:var(--navy);margin-right:4px}
 .btn-tbl.danger{border-color:#FFCDD2;color:var(--red)}
 .tbl-photo{width:32px;height:32px;border-radius:50%;object-fit:cover;vertical-align:middle;border:1.5px solid var(--border)}
@@ -276,6 +277,7 @@ tr:hover td{background:#FAFBFF}
       <label class="form-lbl">Type</label>
       <select class="form-in" id="salType">
         <option value="INTERNE">INTERNE</option>
+        <option value="INTERIMAIRE">INTÉRIMAIRE</option>
         <option value="EXT">SOUS-TRAITANT</option>
       </select>
     </div>
@@ -608,12 +610,14 @@ function renderAll() {
       var photoCell = s.photo
         ? '<img class="tbl-photo" src="'+s.photo+'" alt="">'
         : '<span class="tbl-photo-placeholder">👤</span>';
+      var typePillClass = s.type==="INTERNE" ? "pill-blue" : (s.type==="INTERIMAIRE" ? "pill-purple" : "pill-gold");
+      var typeLabel = s.type==="INTERNE" ? "INTERNE" : (s.type==="INTERIMAIRE" ? "INTÉRIMAIRE" : "SOUS-TRAITANT");
       return '<tr>'+
         '<td>'+photoCell+'</td>'+
         '<td><code style="font-size:11px;font-weight:700;color:var(--navy)">'+s.code+'</code></td>'+
         '<td><strong>'+s.nom+'</strong></td>'+
         '<td>'+s.poste+'</td>'+
-        '<td><span class="pill '+(s.type==="INTERNE"?"pill-blue":"pill-gold")+'">'+s.type+'</span></td>'+
+        '<td><span class="pill '+typePillClass+'">'+typeLabel+'</span></td>'+
         '<td><span class="pill '+(s.statut==="ACTIF"?"pill-green":"pill-red")+'">'+s.statut+'</span></td>'+
         '<td style="font-size:12px">'+ch.join(", ")+'</td>'+
         '<td><button class="btn-tbl" onclick="showQR(\''+s.code+'\')">📱 QR</button></td>'+

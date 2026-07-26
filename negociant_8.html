@@ -385,7 +385,7 @@ async function showResult(code) {
   document.getElementById("dName").textContent = user ? user.nom : "Inconnu";
   document.getElementById("dSub").textContent = user ? user.poste : "—";
   document.getElementById("dCode").textContent = code;
-  document.getElementById("dBadge").textContent = user ? (user.type === "INTERNE" ? "Salarié interne" : "Sous-traitant") : "Non référencé";
+  document.getElementById("dBadge").textContent = user ? (user.type === "INTERNE" ? "Salarié interne" : (user.type === "INTERIMAIRE" ? "Intérimaire" : "Sous-traitant")) : "Non référencé";
 
   // Photo (vient de la base — visible sur n'importe quel appareil négociant)
   try {

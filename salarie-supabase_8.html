@@ -48,7 +48,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);display:flex;flex-direc
 .live-dot{width:6px;height:6px;background:#34D399;border-radius:50%}
 .ic-body{display:flex;align-items:center;gap:14px}
 .ic-photo-wrap{flex-shrink:0}
-.ic-photo{width:64px;height:64px;border-radius:50%;border:2.5px solid rgba(255,255,255,0.3);background:rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:center;font-size:26px;position:relative;overflow:hidden}
+.ic-photo{width:92px;height:92px;border-radius:50%;border:3px solid rgba(255,255,255,0.3);background:rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:center;font-size:38px;position:relative;overflow:hidden}
 .ic-info{flex:1;min-width:0}
 .ic-company{font-size:10px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px}
 .ic-name{font-size:19px;font-weight:800;letter-spacing:-0.3px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -488,7 +488,7 @@ function showCarte(user) {
   var companyNames = {"MAG":"MAGENCIA","EXT":"Sous-traitant","ATL":"ATLAS","MAR":"BTP Martin SAS"};
   var companyName = user.entreprise || companyNames[prefix] || prefix;
 
-  document.getElementById("icBadge").textContent = user.type === "INTERNE" ? "INTERNE" : "SOUS-TRAITANT";
+  document.getElementById("icBadge").textContent = user.type === "INTERNE" ? "INTERNE" : (user.type === "INTERIMAIRE" ? "INTÉRIMAIRE" : "SOUS-TRAITANT");
   document.getElementById("icCompany").textContent = companyName;
   document.getElementById("icName").textContent = user.nom;
   document.getElementById("icPoste").textContent = user.poste;
