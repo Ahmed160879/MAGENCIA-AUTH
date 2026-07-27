@@ -511,13 +511,27 @@ async function loadNegociants() {
         '<td>'+esc(n.agence)+'</td>'+
         '<td>'+esc(n.email||"—")+'</td>'+
         '<td><code style="font-size:10px;word-break:break-all">'+esc(link)+'</code></td>'+
-        '<td><button class="btn-tbl" onclick="copyNegociantLink(\''+link.replace(/'/g,"\\'")+'\')">📋 Copier</button></td>'+
+        '<td>'+
+          '<button class="btn-tbl" onclick="copyNegociantLink(\''+link.replace(/'/g,"\\'")+'\')">📋 Copier</button>'+
+          '<button class="btn-tbl danger" onclick="deleteNegociant(\''+n.auth_user_id+'\',\''+esc(n.agence).replace(/'/g,"\\'")+'\')" title="Supprimer définitivement">🗑️</button>'+
+        '</td>'+
       '</tr>';
     }).join("");
   } catch(e) {
     console.error("loadNegociants error", e);
     body.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:24px">⚠️ Erreur de chargement</td></tr>';
   }
+}
+
+async function deleteNegociant(authUserId, agence) {
+  if (!confirm("⚠️ Supprimer définitivement l'agence " + agence + " ?\n\nElle ne pourra plus se connecter à NégoceID. Cette action est irréversible.")) return;
+  try {
+    var { data, error } = await supabase.rpc('delete_negociant', { p_auth_user_id: authUserId });
+    if (error) { alert("❌ Échec de la suppression :\n" + error.message); return; }
+    if (!data) { alert("❌ Suppression impossible pour cette agence."); return; }
+  } catch(e) { alert("❌ Erreur :\n" + e.message); return; }
+  loadNegociants();
+  alert("🗑️ Agence supprimée");
 }
 
 function copyNegociantLink(link) {
