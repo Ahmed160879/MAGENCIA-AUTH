@@ -225,6 +225,22 @@ body{font-family:'Inter',sans-serif;background:var(--bg);display:flex;flex-direc
           <input class="bl-input" id="blInput" type="text" placeholder="N° BL ou lien" autocomplete="off" autocorrect="off" spellcheck="false" onfocus="cancelAutoReset()" onkeydown="if(event.key==='Enter')saveBL()">
         </div>
       </div>
+      <div style="margin-top:14px">
+        <div style="font-size:10px;font-weight:700;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:6px">📷 Ou scanner le BL (optionnel)</div>
+        <div id="blCamWrap" style="display:none;position:relative;width:100%;border-radius:12px;overflow:hidden;background:#000;margin-bottom:8px">
+          <video id="blVideo" autoplay playsinline muted style="width:100%;height:220px;object-fit:cover;display:block"></video>
+          <div style="position:absolute;inset:16px;border:3px solid var(--gold);border-radius:10px;pointer-events:none"></div>
+          <canvas id="blCanvas" style="display:none"></canvas>
+        </div>
+        <div id="blCamActions" class="bl-row" style="display:none;margin-bottom:8px">
+          <button type="button" class="bl-btn" style="flex:1" onclick="captureBLPhoto()">📸 Capturer</button>
+          <button type="button" class="bl-btn" style="flex:1;background:rgba(255,255,255,0.15);color:#fff" onclick="closeBLCam()">Annuler</button>
+        </div>
+        <div id="blPhotoTrigger" style="display:flex;align-items:center;gap:10px">
+          <button type="button" class="bl-btn" style="flex:1" onclick="openBLCam()" id="blPhotoBtn">📷 Scanner le BL</button>
+          <img id="blPhotoThumb" src="" alt="" style="display:none;width:44px;height:44px;border-radius:8px;object-fit:cover;border:2px solid rgba(255,255,255,0.3)">
+        </div>
+      </div>
       <button class="bl-btn" style="width:100%;margin-top:14px;padding:14px" onclick="saveBL()">✓ Valider le retrait pour ce chantier</button>
       <div class="bl-saved" id="blSaved">
         <div style="font-size:16px">✅</div>
@@ -313,6 +329,63 @@ function esc(v) {
 
 function isHttpUrl(v) {
   return /^https?:\/\//i.test(String(v || "").trim());
+}
+
+// ── SCAN DU BON DE LIVRAISON ──
+// Caméra dédiée à la capture d'une photo du BL, séparée de celle du QR
+// (celle-ci est déjà arrêtée à ce stade, une fois le résultat affiché).
+var currentBLPhoto = null;
+var blCamStream = null;
+
+function openBLCam() {
+  document.getElementById("blCamWrap").style.display = "block";
+  document.getElementById("blCamActions").style.display = "flex";
+  document.getElementById("blPhotoTrigger").style.display = "none";
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+    .then(function(stream) {
+      blCamStream = stream;
+      var v = document.getElementById("blVideo");
+      v.srcObject = stream;
+      v.play();
+    })
+    .catch(function() {
+      alert("❌ Caméra indisponible");
+      closeBLCam();
+    });
+}
+
+function captureBLPhoto() {
+  var v = document.getElementById("blVideo");
+  var c = document.getElementById("blCanvas");
+  if (!v.videoWidth) return;
+  var maxSize = 1400;
+  var scale = Math.min(1, maxSize / Math.max(v.videoWidth, v.videoHeight));
+  c.width = Math.round(v.videoWidth * scale);
+  c.height = Math.round(v.videoHeight * scale);
+  var ctx = c.getContext("2d");
+  ctx.drawImage(v, 0, 0, c.width, c.height);
+  currentBLPhoto = c.toDataURL("image/jpeg", 0.72);
+  var thumb = document.getElementById("blPhotoThumb");
+  thumb.src = currentBLPhoto;
+  thumb.style.display = "block";
+  document.getElementById("blPhotoBtn").textContent = "✅ Photo jointe — reprendre";
+  closeBLCam();
+}
+
+function closeBLCam() {
+  if (blCamStream) { blCamStream.getTracks().forEach(function(t){ t.stop(); }); blCamStream = null; }
+  document.getElementById("blCamWrap").style.display = "none";
+  document.getElementById("blCamActions").style.display = "none";
+  document.getElementById("blPhotoTrigger").style.display = "flex";
+}
+
+function resetBLPhoto() {
+  currentBLPhoto = null;
+  closeBLCam();
+  var thumb = document.getElementById("blPhotoThumb");
+  if (thumb) thumb.style.display = "none";
+  var btn = document.getElementById("blPhotoBtn");
+  if (btn) btn.textContent = "📷 Scanner le BL";
 }
 
 var currentNego = null;
@@ -509,6 +582,7 @@ async function showResult(code) {
 
   document.getElementById("blCard").style.display = ok ? "block" : "none";
   document.getElementById("blInput").value = "";
+  resetBLPhoto();
   window._currentAuthorizedChantiers = (user && Array.isArray(user.chantiers)) ? user.chantiers : [];
   renderChantierField(window._currentAuthorizedChantiers);
   document.getElementById("chantierErr").style.display = "none";
@@ -592,7 +666,8 @@ async function saveBL() {
     var { data, error } = await supabase.rpc('validate_passage_chantier', {
       p_passage_id: currentPassageId,
       p_chantier: chantier,
-      p_bon_livraison: bl || null
+      p_bon_livraison: bl || null,
+      p_bon_livraison_photo: currentBLPhoto || null
     });
     if (error) throw error;
     saved = data === true;
@@ -697,6 +772,7 @@ function stopCam() {
 function resetScan() {
   cancelAutoReset();
   stopCam();
+  resetBLPhoto();
   currentPassageCode = null;
   document.getElementById("mi").value = "";
   document.getElementById("camSt").textContent = "Pointez vers le QR du salarié";
