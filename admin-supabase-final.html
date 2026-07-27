@@ -803,8 +803,13 @@ function renderAll() {
       var d = p.created_at ? new Date(p.created_at).toLocaleString("fr-FR") : "—";
       var blKey = p.bon_livraison ? String(p.bon_livraison).trim().toUpperCase() : "";
       var isDup = blKey && blCounts[blKey] > 1;
+      // Un texte de BL anormalement long (ex: lien collé par erreur) ne doit
+      // jamais étirer la colonne — on l'affiche tronqué, avec le texte complet
+      // visible au survol (title).
+      var blRaw = p.bon_livraison ? String(p.bon_livraison) : "";
+      var blDisplay = blRaw.length > 24 ? esc(blRaw.slice(0, 24)) + "…" : esc(blRaw);
       var blCell = p.bon_livraison
-        ? '<span style="font-family:monospace;font-size:11px;font-weight:700;background:'+(isDup?"#FDEDED":"#FFF8EC")+';color:'+(isDup?"#C62828":"#B45309")+';padding:3px 8px;border-radius:6px">'+esc(p.bon_livraison)+'</span>'
+        ? '<span title="'+esc(blRaw)+'" style="display:inline-block;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom;font-family:monospace;font-size:11px;font-weight:700;background:'+(isDup?"#FDEDED":"#FFF8EC")+';color:'+(isDup?"#C62828":"#B45309")+';padding:3px 8px;border-radius:6px">'+blDisplay+'</span>'
           + (isDup ? '<div style="font-size:10px;color:#C62828;font-weight:700;margin-top:2px">⚠️ utilisé '+blCounts[blKey]+'x</div>' : '')
         : '<span style="color:var(--muted);font-size:11px">—</span>';
       return '<tr>'+
