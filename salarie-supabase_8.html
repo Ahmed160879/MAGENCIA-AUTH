@@ -273,6 +273,16 @@ textarea.dmd-in{resize:none;min-height:80px}
 var SUPABASE_URL = "https://rzveghiwbjafmfhrfscb.supabase.co";
 var SUPABASE_KEY = "sb_publishable_Hb6ILSc7bzW_sC6ZD2X7Nw_QP5homkU";
 var supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// Échappement HTML — utilisé pour toute donnée insérée via innerHTML
+// (nom d'agence, message, chantier...) afin d'empêcher qu'un texte du
+// type <script> ne s'exécute dans cette session salarié.
+function esc(v) {
+  return String(v == null ? "" : v)
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+}
+
 var currentCode = null;
 var pendingUser = null;
 var pinMode = null;
@@ -313,12 +323,12 @@ async function loadBL() {
       var bl = p.bon_livraison || null;
       return '<div class="bl-item">'+
         '<div class="bl-item-top">'+
-          '<div class="bl-item-nego">🏪 '+(p.agence||"—")+'</div>'+
-          '<div class="bl-item-num '+(bl?"":"empty")+'">'+(bl?"BL "+bl:"Sans BL")+'</div>'+
+          '<div class="bl-item-nego">🏪 '+esc(p.agence||"—")+'</div>'+
+          '<div class="bl-item-num '+(bl?"":"empty")+'">'+(bl?"BL "+esc(bl):"Sans BL")+'</div>'+
         '</div>'+
         '<div class="bl-item-meta">'+
           '<span>📅 '+date+'</span>'+
-          (p.chantier?'<span>🏗️ '+p.chantier+'</span>':'')+
+          (p.chantier?'<span>🏗️ '+esc(p.chantier)+'</span>':'')+
           '<span class="'+(p.resultat==="AUTORISE"?"":"")+(p.resultat==="AUTORISE"?"":"")+'" style="color:'+(p.resultat==="AUTORISE"?"#0CAF60":"#E53935")+'">●  '+(p.resultat==="AUTORISE"?"Autorisé":"Refusé")+'</span>'+
         '</div>'+
       '</div>';
@@ -426,11 +436,11 @@ async function loadMesDemandes() {
       var date = d.created_at ? new Date(d.created_at).toLocaleString("fr-FR") : "—";
       return '<div class="dmd-item">'+
         '<div class="dmd-item-top">'+
-          '<div class="dmd-item-agence">🏪 '+d.agence_cible+'</div>'+
-          '<div class="dmd-item-statut '+d.statut+'">'+(d.statut==="traitee"?"Traitée":"Nouvelle")+'</div>'+
+          '<div class="dmd-item-agence">🏪 '+esc(d.agence_cible)+'</div>'+
+          '<div class="dmd-item-statut '+(d.statut==="traitee"?"traitee":"nouvelle")+'">'+(d.statut==="traitee"?"Traitée":"Nouvelle")+'</div>'+
         '</div>'+
-        '<div class="dmd-item-msg">'+d.message+'</div>'+
-        '<div class="dmd-item-meta">'+date+(d.chantier?' · 🏗️ '+d.chantier:'')+'</div>'+
+        '<div class="dmd-item-msg">'+esc(d.message)+'</div>'+
+        '<div class="dmd-item-meta">'+date+(d.chantier?' · 🏗️ '+esc(d.chantier):'')+'</div>'+
       '</div>';
     }).join("");
   } catch(e) {
@@ -657,7 +667,7 @@ function showCarte(user) {
   }
 
   var ch = Array.isArray(user.chantiers) ? user.chantiers : [];
-  document.getElementById("chList").innerHTML = ch.map(function(c){return '<span class="ch-pill">🏗️ '+c+'</span>';}).join("") || '<span style="color:var(--red);font-size:13px">Aucun chantier autorisé</span>';
+  document.getElementById("chList").innerHTML = ch.map(function(c){return '<span class="ch-pill">🏗️ '+esc(c)+'</span>';}).join("") || '<span style="color:var(--red);font-size:13px">Aucun chantier autorisé</span>';
   // Le QR encode uniquement le code salarié (lu tel quel côté négociant, caméra ou lecteur USB)
   document.getElementById("qrImg").src = "https://api.qrserver.com/v1/create-qr-code/?size=185x185&color=0F1F3D&bgcolor=ffffff&qzone=2&data=" + encodeURIComponent(code);
 

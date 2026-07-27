@@ -301,6 +301,16 @@ body{font-family:'Inter',sans-serif;background:var(--bg);display:flex;flex-direc
 var SUPABASE_URL = "https://rzveghiwbjafmfhrfscb.supabase.co";
 var SUPABASE_KEY = "sb_publishable_Hb6ILSc7bzW_sC6ZD2X7Nw_QP5homkU";
 var supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// Échappement HTML — utilisé pour toute donnée insérée via innerHTML
+// (message envoyé par un salarié, nom, chantier...) afin d'empêcher
+// qu'un texte du type <script> ne s'exécute dans cette session négociant.
+function esc(v) {
+  return String(v == null ? "" : v)
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+}
+
 var currentNego = null;
 // Lire le nom de l'agence depuis l'URL
 var urlParams = new URLSearchParams(window.location.search);
@@ -414,11 +424,11 @@ async function loadDemandesNego() {
       var traitee = d.statut === "traitee";
       return '<div class="dmn-item">'+
         '<div class="dmn-top">'+
-          '<div class="dmn-salarie">'+(d.nom_salarie||d.code_salarie)+'</div>'+
+          '<div class="dmn-salarie">'+esc(d.nom_salarie||d.code_salarie)+'</div>'+
           '<div class="dmn-statut '+(traitee?"traitee":"nouvelle")+'">'+(traitee?"Traitée":"Nouvelle")+'</div>'+
         '</div>'+
-        '<div class="dmn-msg">'+d.message+'</div>'+
-        '<div class="dmn-meta">'+date+(d.chantier?' · 🏗️ '+d.chantier:'')+' · '+d.code_salarie+'</div>'+
+        '<div class="dmn-msg">'+esc(d.message)+'</div>'+
+        '<div class="dmn-meta">'+date+(d.chantier?' · 🏗️ '+esc(d.chantier):'')+' · '+esc(d.code_salarie)+'</div>'+
         (traitee ? '' : '<button class="dmn-btn" onclick="markDemandeTraiteeNego('+d.id+')">✓ Marquer traitée</button>')+
       '</div>';
     }).join("");
@@ -490,7 +500,7 @@ async function showResult(code) {
 
   var ch = document.getElementById("dCh");
   ch.innerHTML = user && user.chantiers && user.chantiers.length > 0
-    ? user.chantiers.map(function(c){return '<div class="ch-row"><div class="ch-dot"></div>'+c+'</div>';}).join("")
+    ? user.chantiers.map(function(c){return '<div class="ch-row"><div class="ch-dot"></div>'+esc(c)+'</div>';}).join("")
     : '<div style="font-size:13px;color:var(--red)">Aucun chantier autorisé</div>';
 
   document.getElementById("blCard").style.display = ok ? "block" : "none";
@@ -626,13 +636,13 @@ async function loadHistorique() {
       var ok = p.resultat === "AUTORISE";
       return '<div class="histo-item">'+
         '<div class="histo-top">'+
-          '<div class="histo-name">'+p.nom_salarie+'</div>'+
+          '<div class="histo-name">'+esc(p.nom_salarie)+'</div>'+
           '<div class="histo-result '+(ok?"ok":"ko")+'">'+(ok?"✅ Autorisé":"🚫 Refusé")+'</div>'+
         '</div>'+
         '<div class="histo-meta">'+
           '<span>'+date+'</span>'+
-          '<span style="font-family:monospace">'+p.code_salarie+'</span>'+
-          (p.bon_livraison?'<span class="histo-bl">BL '+p.bon_livraison+'</span>':'')+
+          '<span style="font-family:monospace">'+esc(p.code_salarie)+'</span>'+
+          (p.bon_livraison?'<span class="histo-bl">BL '+esc(p.bon_livraison)+'</span>':'')+
         '</div>'+
       '</div>';
     }).join("");

@@ -369,6 +369,16 @@ var salPhotoData = null;
 // ── AUTH ──
 var supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+// Échappement HTML — à utiliser systématiquement pour toute donnée
+// (nom, message, chantier, etc.) insérée via innerHTML, afin d'éviter
+// qu'un texte du type <script> saisi quelque part dans l'app ne
+// s'exécute dans une autre session (admin, salarié ou négociant).
+function esc(v) {
+  return String(v == null ? "" : v)
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+}
+
 async function login() {
   var email = document.getElementById("loginEmail").value.trim().toLowerCase();
   var pwd = document.getElementById("loginPwd").value;
@@ -468,9 +478,9 @@ function renderCompaniesSection() {
       actionBtn = '<button class="btn-tbl" onclick="setCompanyStatut(\''+c.id+'\',\'actif\')">🟢 Réactiver</button>';
     }
     return '<tr>'+
-      '<td>'+c.nom+'</td>'+
-      '<td>'+(c.email_admin||"—")+'</td>'+
-      '<td>'+(c.prefix||"—")+'</td>'+
+      '<td>'+esc(c.nom)+'</td>'+
+      '<td>'+esc(c.email_admin||"—")+'</td>'+
+      '<td>'+esc(c.prefix||"—")+'</td>'+
       '<td><span class="pill '+pillClass+'">'+statutLabel+'</span></td>'+
       '<td>'+actionBtn+'</td>'+
     '</tr>';
@@ -585,7 +595,7 @@ function renderCompanyBar() {
   var showAll = currentUser && currentUser.role === "super_admin";
   var filtered = showAll ? COMPANIES : COMPANIES.filter(function(c){return c.id === currentUser.company_id;});
   filtered.forEach(function(c) {
-    html += '<button class="company-tab" onclick="selectCompany('+JSON.stringify(c).replace(/"/g,'&quot;')+')" id="tab-'+c.id+'">'+c.nom+'</button>';
+    html += '<button class="company-tab" onclick="selectCompany('+JSON.stringify(c).replace(/"/g,'&quot;')+')" id="tab-'+c.id+'">'+esc(c.nom)+'</button>';
   });
   if (showAll) html += '<button class="btn-add-company" onclick="openAddCompany()">+ Nouvelle entreprise</button>';
   bar.innerHTML = html;
@@ -765,12 +775,12 @@ function renderAll() {
       var typeLabel = s.type==="INTERNE" ? "INTERNE" : (s.type==="INTERIMAIRE" ? "INTÉRIMAIRE" : "SOUS-TRAITANT");
       return '<tr>'+
         '<td>'+photoCell+'</td>'+
-        '<td><code style="font-size:11px;font-weight:700;color:var(--navy)">'+s.code+'</code></td>'+
-        '<td><strong>'+s.nom+'</strong></td>'+
-        '<td>'+s.poste+'</td>'+
+        '<td><code style="font-size:11px;font-weight:700;color:var(--navy)">'+esc(s.code)+'</code></td>'+
+        '<td><strong>'+esc(s.nom)+'</strong></td>'+
+        '<td>'+esc(s.poste)+'</td>'+
         '<td><span class="pill '+typePillClass+'">'+typeLabel+'</span></td>'+
-        '<td><span class="pill '+(s.statut==="ACTIF"?"pill-green":"pill-red")+'">'+s.statut+'</span></td>'+
-        '<td style="font-size:12px">'+ch.join(", ")+'</td>'+
+        '<td><span class="pill '+(s.statut==="ACTIF"?"pill-green":"pill-red")+'">'+esc(s.statut)+'</span></td>'+
+        '<td style="font-size:12px">'+esc(ch.join(", "))+'</td>'+
         '<td><button class="btn-tbl" onclick="showQR(\''+s.code+'\')">📱 QR</button></td>'+
         '<td>'+
           '<button class="btn-tbl" onclick="editSalarie(\''+s.code+'\')">✏️</button>'+
@@ -794,17 +804,17 @@ function renderAll() {
       var blKey = p.bon_livraison ? String(p.bon_livraison).trim().toUpperCase() : "";
       var isDup = blKey && blCounts[blKey] > 1;
       var blCell = p.bon_livraison
-        ? '<span style="font-family:monospace;font-size:11px;font-weight:700;background:'+(isDup?"#FDEDED":"#FFF8EC")+';color:'+(isDup?"#C62828":"#B45309")+';padding:3px 8px;border-radius:6px">'+p.bon_livraison+'</span>'
+        ? '<span style="font-family:monospace;font-size:11px;font-weight:700;background:'+(isDup?"#FDEDED":"#FFF8EC")+';color:'+(isDup?"#C62828":"#B45309")+';padding:3px 8px;border-radius:6px">'+esc(p.bon_livraison)+'</span>'
           + (isDup ? '<div style="font-size:10px;color:#C62828;font-weight:700;margin-top:2px">⚠️ utilisé '+blCounts[blKey]+'x</div>' : '')
         : '<span style="color:var(--muted);font-size:11px">—</span>';
       return '<tr>'+
         '<td style="font-size:12px">'+d+'</td>'+
-        '<td><code style="font-size:11px;font-weight:700">'+p.code_salarie+'</code></td>'+
-        '<td>'+p.nom_salarie+'</td>'+
-        '<td>'+p.agence+'</td>'+
-        '<td>'+(p.chantier?'<span style="font-size:12px;font-weight:600;color:var(--navy)">🏗️ '+p.chantier+'</span>':'<span style="color:var(--muted);font-size:11px">—</span>')+'</td>'+
+        '<td><code style="font-size:11px;font-weight:700">'+esc(p.code_salarie)+'</code></td>'+
+        '<td>'+esc(p.nom_salarie)+'</td>'+
+        '<td>'+esc(p.agence)+'</td>'+
+        '<td>'+(p.chantier?'<span style="font-size:12px;font-weight:600;color:var(--navy)">🏗️ '+esc(p.chantier)+'</span>':'<span style="color:var(--muted);font-size:11px">—</span>')+'</td>'+
         '<td>'+blCell+'</td>'+
-        '<td><span class="pill '+(p.resultat==="AUTORISE"?"pill-green":"pill-red")+'">'+p.resultat+'</span></td>'+
+        '<td><span class="pill '+(p.resultat==="AUTORISE"?"pill-green":"pill-red")+'">'+esc(p.resultat)+'</span></td>'+
       '</tr>';
     }).join("");
   }
