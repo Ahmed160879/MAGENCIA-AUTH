@@ -173,6 +173,38 @@ body{font-family:'Inter',sans-serif;background:var(--bg);display:flex;flex-direc
   <button class="btn-login" onclick="loginNego()">Accéder →</button>
   <div class="err" id="loginErr">❌ Code incorrect</div>
   <div class="demo-hint">Code d'accès propre à votre agence</div>
+  <div style="text-align:center;margin-top:14px">
+    <span style="font-size:13px;color:var(--muted);cursor:pointer;text-decoration:underline" onclick="showForgotNego()">Mot de passe oublié ?</span>
+  </div>
+</div>
+
+<!-- MOT DE PASSE OUBLIÉ -->
+<div class="screen hidden" id="sForgotNego" style="align-items:center;justify-content:center;padding:28px 24px">
+  <div class="brand-mark">✉️</div>
+  <div class="login-h">Mot de passe oublié</div>
+  <div class="login-p">Un lien de réinitialisation sera envoyé à l'adresse email de connexion de cette agence.</div>
+  <button class="btn-login" onclick="sendResetNego()">Envoyer le lien →</button>
+  <div class="err" id="forgotNegoErr" style="display:none;max-width:300px"></div>
+  <div class="err" id="forgotNegoOk" style="display:none;max-width:300px;background:#EDFBF3;color:#0CAF60">✅ Email envoyé — vérifiez votre boîte de réception</div>
+  <div style="text-align:center;margin-top:14px">
+    <span style="font-size:13px;color:var(--muted);cursor:pointer;text-decoration:underline" onclick="backToLoginNego()">← Retour à la connexion</span>
+  </div>
+</div>
+
+<!-- NOUVEAU MOT DE PASSE (arrivée depuis le lien reçu par email) -->
+<div class="screen hidden" id="sNewPwdNego" style="align-items:center;justify-content:center;padding:28px 24px">
+  <div class="brand-mark">🔑</div>
+  <div class="login-h">Nouveau mot de passe</div>
+  <div class="field">
+    <label class="field-lbl">Nouveau mot de passe</label>
+    <input class="field-in" id="newPwdNegoReset1" type="password" placeholder="••••••••">
+  </div>
+  <div class="field">
+    <label class="field-lbl">Confirmez le mot de passe</label>
+    <input class="field-in" id="newPwdNegoReset2" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')submitNewPasswordNego()">
+  </div>
+  <button class="btn-login" onclick="submitNewPasswordNego()">Valider →</button>
+  <div class="err" id="newPwdNegoResetErr" style="display:none;max-width:300px"></div>
 </div>
 
 <!-- TABS -->
@@ -280,6 +312,18 @@ body{font-family:'Inter',sans-serif;background:var(--bg);display:flex;flex-direc
         <button class="btn-refresh" onclick="loadHistorique()">↻</button>
       </div>
       <div id="histoList"><div style="text-align:center;padding:24px;color:var(--muted)">⏳ Chargement...</div></div>
+    </div>
+    <div class="histo-card">
+      <div class="histo-title">🔑 Changer mon mot de passe</div>
+      <div class="field" style="max-width:none;margin-bottom:10px">
+        <input class="field-in" id="newPwdNego1" type="password" placeholder="Nouveau mot de passe">
+      </div>
+      <div class="field" style="max-width:none;margin-bottom:10px">
+        <input class="field-in" id="newPwdNego2" type="password" placeholder="Confirmer le mot de passe" onkeydown="if(event.key==='Enter')changePasswordNego()">
+      </div>
+      <button class="btn-cam" style="width:100%" onclick="changePasswordNego()">Mettre à jour</button>
+      <div class="err" id="pwdNegoErr" style="display:none;margin-top:10px;max-width:none"></div>
+      <div class="err" id="pwdNegoOk" style="display:none;margin-top:10px;max-width:none;background:#EDFBF3;color:#0CAF60">✅ Mot de passe mis à jour</div>
     </div>
     <button class="btn-out" onclick="logout()">← Déconnexion</button>
   </div>
@@ -729,6 +773,94 @@ async function logout() {
   document.getElementById("sDemandesNego").classList.add("hidden");
   document.getElementById("sLogin").classList.remove("hidden");
   await supabase.auth.signOut();
+}
+
+// ── MOT DE PASSE OUBLIÉ ──
+// Le négociant ne saisit jamais son email (seulement son code d'accès /
+// mot de passe) : on le retrouve côté serveur via get_negociant_email,
+// à partir du nom d'agence déjà connu dans l'URL (?nego=...).
+function showForgotNego() {
+  if (!negoFromUrl) { alert("❌ Agence manquante dans le lien (paramètre ?nego=...)"); return; }
+  document.getElementById("sLogin").classList.add("hidden");
+  document.getElementById("sForgotNego").classList.remove("hidden");
+  document.getElementById("forgotNegoErr").style.display = "none";
+  document.getElementById("forgotNegoOk").style.display = "none";
+}
+
+function backToLoginNego() {
+  document.getElementById("sForgotNego").classList.add("hidden");
+  document.getElementById("sLogin").classList.remove("hidden");
+}
+
+async function sendResetNego() {
+  var errEl = document.getElementById("forgotNegoErr");
+  var okEl = document.getElementById("forgotNegoOk");
+  errEl.style.display = "none";
+  okEl.style.display = "none";
+  var email = null;
+  try {
+    var { data, error } = await supabase.rpc('get_negociant_email', { p_agence: negoFromUrl });
+    if (!error && data) email = data;
+  } catch(e) { console.error("get_negociant_email error", e); }
+  if (!email) {
+    errEl.textContent = "❌ Agence inconnue";
+    errEl.style.display = "block";
+    return;
+  }
+  var { error: resetErr } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.origin + window.location.pathname + window.location.search
+  });
+  if (resetErr) {
+    errEl.textContent = "❌ " + resetErr.message;
+    errEl.style.display = "block";
+    return;
+  }
+  okEl.style.display = "block";
+}
+
+async function submitNewPasswordNego() {
+  var p1 = document.getElementById("newPwdNegoReset1").value;
+  var p2 = document.getElementById("newPwdNegoReset2").value;
+  var errEl = document.getElementById("newPwdNegoResetErr");
+  errEl.style.display = "none";
+  if (p1.length < 8) { errEl.textContent = "❌ Le mot de passe doit faire au moins 8 caractères"; errEl.style.display = "block"; return; }
+  if (p1 !== p2) { errEl.textContent = "❌ Les mots de passe ne correspondent pas"; errEl.style.display = "block"; return; }
+  var { error } = await supabase.auth.updateUser({ password: p1 });
+  if (error) { errEl.textContent = "❌ " + error.message; errEl.style.display = "block"; return; }
+  document.getElementById("sNewPwdNego").classList.add("hidden");
+  document.getElementById("sLogin").classList.remove("hidden");
+  alert("✅ Mot de passe mis à jour, vous pouvez vous reconnecter.");
+}
+
+// Détecte l'arrivée depuis le lien de réinitialisation reçu par email
+supabase.auth.onAuthStateChange(function(event, session) {
+  if (event === "PASSWORD_RECOVERY") {
+    document.getElementById("sLogin").classList.add("hidden");
+    document.getElementById("sForgotNego").classList.add("hidden");
+    document.getElementById("tabBar").classList.add("hidden");
+    document.getElementById("sScan").classList.add("hidden");
+    document.getElementById("sHistorique").classList.add("hidden");
+    document.getElementById("sDemandesNego").classList.add("hidden");
+    document.getElementById("sNewPwdNego").classList.remove("hidden");
+  }
+});
+
+// ── CHANGER LE MOT DE PASSE (une fois connecté — remplace le mot de
+// passe provisoire donné à la création du compte) ──
+async function changePasswordNego() {
+  var p1 = document.getElementById("newPwdNego1").value;
+  var p2 = document.getElementById("newPwdNego2").value;
+  var errEl = document.getElementById("pwdNegoErr");
+  var okEl = document.getElementById("pwdNegoOk");
+  errEl.style.display = "none";
+  okEl.style.display = "none";
+  if (p1.length < 8) { errEl.textContent = "❌ Le mot de passe doit faire au moins 8 caractères"; errEl.style.display = "block"; return; }
+  if (p1 !== p2) { errEl.textContent = "❌ Les mots de passe ne correspondent pas"; errEl.style.display = "block"; return; }
+  var { error } = await supabase.auth.updateUser({ password: p1 });
+  if (error) { errEl.textContent = "❌ " + error.message; errEl.style.display = "block"; return; }
+  document.getElementById("newPwdNego1").value = "";
+  document.getElementById("newPwdNego2").value = "";
+  okEl.style.display = "block";
 }
 </script>
 </body>
