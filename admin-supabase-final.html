@@ -379,23 +379,6 @@ function esc(v) {
     .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
 }
 
-// Un négociant peut coller un lien vers le bon de livraison (issu de son
-// propre logiciel) dans le champ N° de BL au lieu d'un simple numéro.
-// On ne considère comme lien que http(s):// explicite, pour ne jamais
-// pouvoir injecter un href="javascript:..." malgré l'échappement.
-function isHttpUrl(v) {
-  return /^https?:\/\//i.test(String(v || "").trim());
-}
-
-// Ouvre dans un nouvel onglet la photo du BL prise par le négociant
-// (stockée en base64 dans passages.bon_livraison_photo).
-function showBLPhoto(passageId) {
-  var p = passages.find(function(x){ return x.id === passageId; });
-  if (!p || !p.bon_livraison_photo) return;
-  var w = window.open("", "_blank");
-  w.document.write('<html><body style="margin:0;background:#111;display:flex;align-items:center;justify-content:center;min-height:100vh"><img src="'+p.bon_livraison_photo+'" style="max-width:100%;max-height:100vh"></body></html>');
-}
-
 async function login() {
   var email = document.getElementById("loginEmail").value.trim().toLowerCase();
   var pwd = document.getElementById("loginPwd").value;
@@ -820,14 +803,8 @@ function renderAll() {
       var d = p.created_at ? new Date(p.created_at).toLocaleString("fr-FR") : "—";
       var blKey = p.bon_livraison ? String(p.bon_livraison).trim().toUpperCase() : "";
       var isDup = blKey && blCounts[blKey] > 1;
-      var blIsLink = p.bon_livraison && isHttpUrl(p.bon_livraison);
-      var blContent = p.bon_livraison_photo
-        ? '<a href="#" onclick="showBLPhoto('+JSON.stringify(p.id)+');return false;" style="color:inherit;text-decoration:underline">📷 Voir le BL</a>'
-        : (blIsLink
-            ? '<a href="'+esc(p.bon_livraison)+'" target="_blank" rel="noopener noreferrer" style="color:inherit;text-decoration:underline">📎 Voir le BL</a>'
-            : esc(p.bon_livraison));
-      var blCell = (p.bon_livraison || p.bon_livraison_photo)
-        ? '<span style="font-family:monospace;font-size:11px;font-weight:700;background:'+(isDup?"#FDEDED":"#FFF8EC")+';color:'+(isDup?"#C62828":"#B45309")+';padding:3px 8px;border-radius:6px">'+blContent+'</span>'
+      var blCell = p.bon_livraison
+        ? '<span style="font-family:monospace;font-size:11px;font-weight:700;background:'+(isDup?"#FDEDED":"#FFF8EC")+';color:'+(isDup?"#C62828":"#B45309")+';padding:3px 8px;border-radius:6px">'+esc(p.bon_livraison)+'</span>'
           + (isDup ? '<div style="font-size:10px;color:#C62828;font-weight:700;margin-top:2px">⚠️ utilisé '+blCounts[blKey]+'x</div>' : '')
         : '<span style="color:var(--muted);font-size:11px">—</span>';
       return '<tr>'+
