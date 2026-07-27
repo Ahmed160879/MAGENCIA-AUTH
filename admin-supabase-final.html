@@ -434,6 +434,7 @@ async function login() {
   renderCompaniesSection();
   if (currentUser.role === "super_admin") {
     if (COMPANIES.length > 0) selectCompany(COMPANIES[0]);
+    subscribeToEntreprises();
   } else {
     var comp = COMPANIES.find(function(c){return c.id === currentUser.company_id;});
     selectCompany(comp || COMPANIES[0]);
@@ -529,6 +530,7 @@ async function logout() {
   if (emailEl) emailEl.value = "";
   if (pwdEl) pwdEl.value = "";
   unsubscribeRealtime();
+  unsubscribeEntreprises();
   await supabase.auth.signOut();
 }
 
@@ -641,6 +643,44 @@ function unsubscribeRealtime() {
   if (realtimeChannel) {
     supabase.removeChannel(realtimeChannel);
     realtimeChannel = null;
+  }
+}
+
+// ── TEMPS RÉEL — DEMANDES D'INSCRIPTION (entreprises) ──
+// Permet à l'onglet "Gestion des entreprises" de se mettre à jour tout
+// seul (nouvelle inscription, changement de statut) sans que le super
+// admin ait besoin de rafraîchir la page.
+var entreprisesChannel = null;
+var entreprisesReloadTimer = null;
+
+function subscribeToEntreprises() {
+  if (entreprisesChannel) {
+    supabase.removeChannel(entreprisesChannel);
+    entreprisesChannel = null;
+  }
+  entreprisesChannel = supabase.channel('entreprises-realtime-' + Date.now())
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'entreprises' }, function() {
+      scheduleEntreprisesReload();
+    })
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'entreprises' }, function() {
+      scheduleEntreprisesReload();
+    })
+    .subscribe();
+}
+
+function scheduleEntreprisesReload() {
+  if (entreprisesReloadTimer) clearTimeout(entreprisesReloadTimer);
+  entreprisesReloadTimer = setTimeout(async function() {
+    await loadCompanies();
+    renderCompanyBar();
+    renderCompaniesSection();
+  }, 400);
+}
+
+function unsubscribeEntreprises() {
+  if (entreprisesChannel) {
+    supabase.removeChannel(entreprisesChannel);
+    entreprisesChannel = null;
   }
 }
 
