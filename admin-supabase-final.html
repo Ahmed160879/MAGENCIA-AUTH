@@ -478,12 +478,14 @@ function renderCompaniesSection() {
     } else {
       actionBtn = '<button class="btn-tbl" onclick="setCompanyStatut(\''+c.id+'\',\'actif\')">🟢 Réactiver</button>';
     }
+    var isMagencia = String(c.prefix||"").toUpperCase() === "MAG";
+    var deleteBtn = isMagencia ? "" : '<button class="btn-tbl danger" onclick="deleteCompany(\''+c.id+'\',\''+esc(c.nom).replace(/'/g,"\\'")+'\')" title="Supprimer définitivement">🗑️</button>';
     return '<tr>'+
       '<td>'+esc(c.nom)+'</td>'+
       '<td>'+esc(c.email_admin||"—")+'</td>'+
       '<td>'+esc(c.prefix||"—")+'</td>'+
       '<td><span class="pill '+pillClass+'">'+statutLabel+'</span></td>'+
-      '<td>'+actionBtn+'</td>'+
+      '<td>'+actionBtn+' '+deleteBtn+'</td>'+
     '</tr>';
   }).join("");
 }
@@ -506,6 +508,26 @@ async function setCompanyStatut(id, newStatut) {
   renderCompanyBar();
   renderCompaniesSection();
   alert(newStatut === "actif" ? "✅ Entreprise réactivée" : "⛔ Entreprise désactivée");
+}
+
+async function deleteCompany(id, nom) {
+  var confirmText = "⚠️ Supprimer définitivement " + nom + " ?\n\nCela supprime aussi TOUS ses salariés et TOUT son historique de passages, ainsi que l'accès de son administrateur. Cette action est irréversible.";
+  if (!confirm(confirmText)) return;
+  // Double confirmation : action destructive et irréversible.
+  if (!confirm("Dernière confirmation — vraiment supprimer " + nom + " et toutes ses données ?")) return;
+  try {
+    var { data, error } = await supabase.rpc('delete_entreprise_cascade', { p_id: id });
+    if (error) { alert("❌ Échec de la suppression :\n" + error.message); return; }
+    if (!data) { alert("❌ Suppression impossible pour cette entreprise."); return; }
+  } catch(e) { alert("❌ Erreur :\n" + e.message); return; }
+  await loadCompanies();
+  renderCompanyBar();
+  renderCompaniesSection();
+  if (currentCompany && currentCompany.id === id) {
+    currentCompany = null;
+    if (COMPANIES.length > 0) selectCompany(COMPANIES[0]);
+  }
+  alert("🗑️ Entreprise supprimée");
 }
 
 async function loadCompanies() {
