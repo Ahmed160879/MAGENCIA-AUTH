@@ -78,6 +78,9 @@ tr:hover td{background:#FAFBFF}
 .filter-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
 .filter-select{padding:9px 12px;border:2px solid var(--border);border-radius:10px;font-size:13px;color:var(--navy);background:var(--white);min-width:190px}
 .filter-select:focus{outline:none;border-color:var(--gold)}
+.dash-tabs{display:flex;gap:8px;margin-bottom:20px;border-bottom:2px solid var(--border);padding-bottom:0}
+.dash-tab{padding:10px 18px;border:none;background:transparent;font-size:13px;font-weight:700;color:var(--muted);cursor:pointer;border-bottom:2.5px solid transparent;margin-bottom:-2px}
+.dash-tab.active{color:var(--navy);border-bottom-color:var(--gold)}
 
 /* MODAL */
 .modal-bg{position:fixed;inset:0;background:rgba(15,31,61,0.5);display:none;align-items:center;justify-content:center;z-index:100;padding:20px}
@@ -189,65 +192,79 @@ tr:hover td{background:#FAFBFF}
 
 <!-- DASHBOARD -->
 <div id="screenDash">
-  <!-- SÉLECTEUR ENTREPRISES -->
-  <div style="margin-bottom:20px;margin-top:4px">
-    <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">Entreprises</div>
-    <div class="company-bar" id="companyBar">
-      <button class="btn-add-company" onclick="openAddCompany()">+ Nouvelle entreprise</button>
-    </div>
+  <!-- ONGLETS PRINCIPAUX (super admin uniquement) -->
+  <div class="dash-tabs" id="dashTabs" style="display:none">
+    <button class="dash-tab active" id="dashTabSalaries" onclick="switchDashView('salaries',this)">👤 Salariés & passages</button>
+    <button class="dash-tab" id="dashTabCompanies" onclick="switchDashView('companies',this)">🏢 Gestion des entreprises</button>
   </div>
 
-  <!-- KPIs -->
-  <div class="kpi-grid">
-    <div class="kpi"><div class="kpi-icon">👤</div><div class="kpi-val" id="kpiSal">—</div><div class="kpi-lbl">Salariés actifs</div></div>
-    <div class="kpi"><div class="kpi-icon">📊</div><div class="kpi-val" id="kpiPass">—</div><div class="kpi-lbl">Passages total</div></div>
-    <div class="kpi"><div class="kpi-icon">✅</div><div class="kpi-val" id="kpiOk" style="color:var(--green)">—</div><div class="kpi-lbl">Autorisés</div></div>
-    <div class="kpi"><div class="kpi-icon">🚫</div><div class="kpi-val" id="kpiKo" style="color:var(--red)">—</div><div class="kpi-lbl">Refusés</div></div>
-  </div>
-
-  <!-- SALARIÉS -->
-  <div class="section">
-    <div class="section-hdr">
-      <div class="section-title">👤 Salariés — <span id="currentCompanyName" style="color:var(--gold)">—</span></div>
-      <div class="section-actions">
-        <button class="btn-action btn-gold" onclick="openAddSalarie()">+ Ajouter</button>
-        <button class="btn-action btn-outline" onclick="exportCSV('salaries')">⬇️ Export</button>
+  <!-- VUE : SALARIÉS & PASSAGES -->
+  <div id="viewDashSalaries">
+    <!-- SÉLECTEUR ENTREPRISES -->
+    <div style="margin-bottom:20px;margin-top:4px">
+      <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">Entreprises</div>
+      <div class="company-bar" id="companyBar">
+        <button class="btn-add-company" onclick="openAddCompany()">+ Nouvelle entreprise</button>
       </div>
     </div>
-    <table>
-      <thead><tr><th>Photo</th><th>Code</th><th>Nom</th><th>Poste</th><th>Type</th><th>Statut</th><th>Chantiers autorisés</th><th>QR</th><th>Actions</th></tr></thead>
-      <tbody id="salariesBody"><tr><td colspan="9" style="text-align:center;color:var(--muted);padding:24px">⏳ Chargement...</td></tr></tbody>
-    </table>
-  </div>
 
-  <!-- HISTORIQUE -->
-  <div class="section">
-    <div class="section-hdr">
-      <div class="section-title">📋 Historique des passages</div>
-      <div class="section-actions">
-        <button class="btn-action btn-outline" onclick="exportCSV('passages')">⬇️ Export CSV</button>
+    <!-- KPIs -->
+    <div class="kpi-grid">
+      <div class="kpi"><div class="kpi-icon">👤</div><div class="kpi-val" id="kpiSal">—</div><div class="kpi-lbl">Salariés actifs</div></div>
+      <div class="kpi"><div class="kpi-icon">📊</div><div class="kpi-val" id="kpiPass">—</div><div class="kpi-lbl">Passages total</div></div>
+      <div class="kpi"><div class="kpi-icon">✅</div><div class="kpi-val" id="kpiOk" style="color:var(--green)">—</div><div class="kpi-lbl">Autorisés</div></div>
+      <div class="kpi"><div class="kpi-icon">🚫</div><div class="kpi-val" id="kpiKo" style="color:var(--red)">—</div><div class="kpi-lbl">Refusés</div></div>
+    </div>
+
+    <!-- SALARIÉS -->
+    <div class="section">
+      <div class="section-hdr">
+        <div class="section-title">👤 Salariés — <span id="currentCompanyName" style="color:var(--gold)">—</span></div>
+        <div class="section-actions">
+          <button class="btn-action btn-gold" onclick="openAddSalarie()">+ Ajouter</button>
+          <button class="btn-action btn-outline" onclick="exportCSV('salaries')">⬇️ Export</button>
+        </div>
       </div>
+      <table>
+        <thead><tr><th>Photo</th><th>Code</th><th>Nom</th><th>Poste</th><th>Type</th><th>Statut</th><th>Chantiers autorisés</th><th>QR</th><th>Actions</th></tr></thead>
+        <tbody id="salariesBody"><tr><td colspan="9" style="text-align:center;color:var(--muted);padding:24px">⏳ Chargement...</td></tr></tbody>
+      </table>
     </div>
-    <div class="filter-row">
-      <select class="filter-select" id="filterSalarie" onchange="renderAll()">
-        <option value="all">Isoler un salarié — tous</option>
-      </select>
+
+    <!-- HISTORIQUE -->
+    <div class="section">
+      <div class="section-hdr">
+        <div class="section-title">📋 Historique des passages</div>
+        <div class="section-actions">
+          <button class="btn-action btn-outline" onclick="exportCSV('passages')">⬇️ Export CSV</button>
+        </div>
+      </div>
+      <div class="filter-row">
+        <select class="filter-select" id="filterSalarie" onchange="renderAll()">
+          <option value="all">Isoler un salarié — tous</option>
+        </select>
+      </div>
+      <table>
+        <thead><tr><th>Date / Heure</th><th>Code</th><th>Salarié</th><th>Agence</th><th>Chantier</th><th>Bon de livraison</th><th>Résultat</th></tr></thead>
+        <tbody id="passagesBody"><tr><td colspan="7" style="text-align:center;color:var(--muted);padding:24px">⏳ Chargement...</td></tr></tbody>
+      </table>
     </div>
-    <table>
-      <thead><tr><th>Date / Heure</th><th>Code</th><th>Salarié</th><th>Agence</th><th>Chantier</th><th>Bon de livraison</th><th>Résultat</th></tr></thead>
-      <tbody id="passagesBody"><tr><td colspan="7" style="text-align:center;color:var(--muted);padding:24px">⏳ Chargement...</td></tr></tbody>
-    </table>
   </div>
 
-  <!-- ENTREPRISES CLIENTES (super admin) -->
-  <div class="section" id="pendingSection" style="display:none">
-    <div class="section-hdr">
-      <div class="section-title">🏢 Entreprises clientes</div>
+  <!-- VUE : GESTION DES ENTREPRISES (super admin) -->
+  <div id="viewDashCompanies" style="display:none">
+    <div class="section" id="pendingSection">
+      <div class="section-hdr">
+        <div class="section-title">🏢 Entreprises clientes</div>
+      </div>
+      <div class="filter-row">
+        <input class="filter-select" id="companySearch" type="text" placeholder="🔎 Rechercher une entreprise (nom, email, préfixe)..." style="flex:1;min-width:260px" oninput="renderCompaniesSection()">
+      </div>
+      <table>
+        <thead><tr><th>Entreprise</th><th>Email</th><th>Préfixe</th><th>Statut</th><th>Action</th></tr></thead>
+        <tbody id="pendingBody"></tbody>
+      </table>
     </div>
-    <table>
-      <thead><tr><th>Entreprise</th><th>Email</th><th>Préfixe</th><th>Statut</th><th>Action</th></tr></thead>
-      <tbody id="pendingBody"></tbody>
-    </table>
   </div>
 </div>
 
@@ -400,6 +417,9 @@ async function login() {
 
   document.getElementById("screenLogin").style.display = "none";
   document.getElementById("screenDash").style.display = "block";
+  var isSuperAdmin = currentUser.role === "super_admin";
+  document.getElementById("dashTabs").style.display = isSuperAdmin ? "flex" : "none";
+  switchDashView("salaries", document.getElementById("dashTabSalaries"));
   renderCompanyBar();
   renderCompaniesSection();
   if (currentUser.role === "super_admin") {
@@ -410,13 +430,32 @@ async function login() {
   }
 }
 
+// ── ONGLETS PRINCIPAUX DU DASHBOARD (super admin) ──
+function switchDashView(view, el) {
+  document.querySelectorAll(".dash-tab").forEach(function(t){t.classList.remove("active");});
+  if (el) el.classList.add("active");
+  document.getElementById("viewDashSalaries").style.display = view === "salaries" ? "block" : "none";
+  document.getElementById("viewDashCompanies").style.display = view === "companies" ? "block" : "none";
+  if (view === "companies") renderCompaniesSection();
+}
+
 function renderCompaniesSection() {
-  var section = document.getElementById("pendingSection");
-  if (!section) return;
-  if (!currentUser || currentUser.role !== "super_admin") { section.style.display = "none"; return; }
-  if (COMPANIES.length === 0) { section.style.display = "none"; return; }
-  section.style.display = "block";
-  document.getElementById("pendingBody").innerHTML = COMPANIES.map(function(c) {
+  var body = document.getElementById("pendingBody");
+  if (!body) return;
+  if (!currentUser || currentUser.role !== "super_admin") return;
+  var searchEl = document.getElementById("companySearch");
+  var q = searchEl ? searchEl.value.trim().toLowerCase() : "";
+  var filtered = COMPANIES.filter(function(c) {
+    if (!q) return true;
+    return (c.nom||"").toLowerCase().indexOf(q) !== -1
+      || (c.email_admin||"").toLowerCase().indexOf(q) !== -1
+      || (c.prefix||"").toLowerCase().indexOf(q) !== -1;
+  });
+  if (filtered.length === 0) {
+    body.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:24px">Aucune entreprise trouvée</td></tr>';
+    return;
+  }
+  body.innerHTML = filtered.map(function(c) {
     var statut = c.statut || "actif";
     var pillClass = statut === "actif" ? "pill-green" : (statut === "en_attente" ? "pill-gold" : "pill-red");
     var statutLabel = statut === "actif" ? "ACTIF" : (statut === "en_attente" ? "EN ATTENTE" : "DÉSACTIVÉ");
