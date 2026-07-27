@@ -208,6 +208,24 @@ body{font-family:'Inter',sans-serif;background:var(--bg);display:flex;flex-direc
   <div class="err" id="newPwdNegoResetErr" style="display:none;max-width:300px"></div>
 </div>
 
+<!-- CHANGEMENT DE MOT DE PASSE OBLIGATOIRE (première connexion avec un
+     mot de passe provisoire) -->
+<div class="screen hidden" id="sForcePwdNego" style="align-items:center;justify-content:center;padding:28px 24px">
+  <div class="brand-mark">🔑</div>
+  <div class="login-h">Choisissez votre mot de passe</div>
+  <div class="login-p">Pour la sécurité de votre compte, remplacez le mot de passe provisoire avant de continuer.</div>
+  <div class="field">
+    <label class="field-lbl">Nouveau mot de passe</label>
+    <input class="field-in" id="forcePwd1" type="password" placeholder="••••••••">
+  </div>
+  <div class="field">
+    <label class="field-lbl">Confirmez le mot de passe</label>
+    <input class="field-in" id="forcePwd2" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')submitForcePassword()">
+  </div>
+  <button class="btn-login" onclick="submitForcePassword()">Valider et continuer →</button>
+  <div class="err" id="forcePwdErr" style="display:none;max-width:300px"></div>
+</div>
+
 <!-- TABS -->
 <div class="hidden" id="tabBar" style="padding:14px 0 0">
   <div class="tabs">
@@ -423,12 +441,49 @@ async function loginNego() {
   currentNego = nego;
   document.getElementById("hdrNego").textContent = nego;
   document.getElementById("sLogin").classList.add("hidden");
+
+  // Si le compte vient d'être créé avec un mot de passe provisoire,
+  // on bloque l'accès au scanner tant qu'il n'est pas remplacé.
+  var mustChange = false;
+  try {
+    var { data: appUser } = await supabase.rpc('current_app_user');
+    mustChange = !!(appUser && appUser.must_change_password);
+  } catch(e) { console.error("current_app_user error", e); }
+
+  if (mustChange) {
+    document.getElementById("sForcePwdNego").classList.remove("hidden");
+    return;
+  }
+
+  enterAppNego();
+}
+
+// Affiche l'app (scanner) une fois la connexion — et si besoin le
+// changement de mot de passe obligatoire — passés avec succès.
+function enterAppNego() {
+  document.getElementById("sForcePwdNego").classList.add("hidden");
+  document.getElementById("sLogin").classList.add("hidden");
   document.getElementById("tabBar").classList.remove("hidden");
   document.getElementById("hdrPwdLink").classList.remove("hidden");
   document.getElementById("sScan").classList.remove("hidden");
   // Focus le champ de saisie manuelle : permet à un lecteur de code-barres/QR USB
   // (qui se comporte comme un clavier) de scanner directement sans clic préalable.
   focusManualInput();
+}
+
+async function submitForcePassword() {
+  var p1 = document.getElementById("forcePwd1").value;
+  var p2 = document.getElementById("forcePwd2").value;
+  var errEl = document.getElementById("forcePwdErr");
+  errEl.style.display = "none";
+  if (p1.length < 8) { errEl.textContent = "❌ Le mot de passe doit faire au moins 8 caractères"; errEl.style.display = "block"; return; }
+  if (p1 !== p2) { errEl.textContent = "❌ Les mots de passe ne correspondent pas"; errEl.style.display = "block"; return; }
+  var { error } = await supabase.auth.updateUser({ password: p1 });
+  if (error) { errEl.textContent = "❌ " + error.message; errEl.style.display = "block"; return; }
+  try { await supabase.rpc('clear_must_change_password'); } catch(e) { console.error("clear_must_change_password error", e); }
+  document.getElementById("forcePwd1").value = "";
+  document.getElementById("forcePwd2").value = "";
+  enterAppNego();
 }
 
 function focusManualInput() {
@@ -774,6 +829,7 @@ async function logout() {
   document.getElementById("sScan").classList.add("hidden");
   document.getElementById("sHistorique").classList.add("hidden");
   document.getElementById("sDemandesNego").classList.add("hidden");
+  document.getElementById("sForcePwdNego").classList.add("hidden");
   document.getElementById("sLogin").classList.remove("hidden");
   await supabase.auth.signOut();
 }
@@ -842,6 +898,7 @@ async function submitNewPasswordNego() {
   if (p1 !== p2) { errEl.textContent = "❌ Les mots de passe ne correspondent pas"; errEl.style.display = "block"; return; }
   var { error } = await supabase.auth.updateUser({ password: p1 });
   if (error) { errEl.textContent = "❌ " + error.message; errEl.style.display = "block"; return; }
+  try { await supabase.rpc('clear_must_change_password'); } catch(e) { console.error("clear_must_change_password error", e); }
   document.getElementById("sNewPwdNego").classList.add("hidden");
   document.getElementById("sLogin").classList.remove("hidden");
   alert("✅ Mot de passe mis à jour, vous pouvez vous reconnecter.");
@@ -873,6 +930,7 @@ async function changePasswordNego() {
   if (p1 !== p2) { errEl.textContent = "❌ Les mots de passe ne correspondent pas"; errEl.style.display = "block"; return; }
   var { error } = await supabase.auth.updateUser({ password: p1 });
   if (error) { errEl.textContent = "❌ " + error.message; errEl.style.display = "block"; return; }
+  try { await supabase.rpc('clear_must_change_password'); } catch(e) { console.error("clear_must_change_password error", e); }
   document.getElementById("newPwdNego1").value = "";
   document.getElementById("newPwdNego2").value = "";
   okEl.style.display = "block";
