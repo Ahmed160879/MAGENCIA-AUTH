@@ -311,6 +311,10 @@ function esc(v) {
     .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
 }
 
+function isHttpUrl(v) {
+  return /^https?:\/\//i.test(String(v || "").trim());
+}
+
 var currentNego = null;
 // Lire le nom de l'agence depuis l'URL
 var urlParams = new URLSearchParams(window.location.search);
@@ -561,7 +565,10 @@ function renderChantierField(chantiers) {
 }
 
 async function saveBL() {
-  var bl = document.getElementById("blInput").value.trim().toUpperCase();
+  var blRaw = document.getElementById("blInput").value.trim();
+  // Un lien collé (URL) est sensible à la casse : on ne met en majuscules
+  // que les numéros de BL classiques, jamais un lien.
+  var bl = isHttpUrl(blRaw) ? blRaw : blRaw.toUpperCase();
   var chantier = document.getElementById("chantierInput").value.trim();
   var errEl = document.getElementById("chantierErr");
   errEl.style.display = "none";
