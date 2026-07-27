@@ -196,6 +196,7 @@ tr:hover td{background:#FAFBFF}
   <div class="dash-tabs" id="dashTabs" style="display:none">
     <button class="dash-tab active" id="dashTabSalaries" onclick="switchDashView('salaries',this)">👤 Salariés & passages</button>
     <button class="dash-tab" id="dashTabCompanies" onclick="switchDashView('companies',this)">🏢 Gestion des entreprises</button>
+    <button class="dash-tab" id="dashTabNegociants" onclick="switchDashView('negociants',this)">🏪 Négociants</button>
   </div>
 
   <!-- VUE : SALARIÉS & PASSAGES -->
@@ -263,6 +264,22 @@ tr:hover td{background:#FAFBFF}
       <table>
         <thead><tr><th>Entreprise</th><th>Email</th><th>Préfixe</th><th>Statut</th><th>Action</th></tr></thead>
         <tbody id="pendingBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- VUE : NÉGOCIANTS (super admin) -->
+  <div id="viewDashNegociants" style="display:none">
+    <div class="section">
+      <div class="section-hdr">
+        <div class="section-title">🏪 Agences négociant</div>
+        <div class="section-actions">
+          <button class="btn-action btn-gold" onclick="openAddNegociant()">+ Nouvelle agence</button>
+        </div>
+      </div>
+      <table>
+        <thead><tr><th>Agence</th><th>Email</th><th>Lien de connexion</th><th>Action</th></tr></thead>
+        <tbody id="negociantsBody"><tr><td colspan="4" style="text-align:center;color:var(--muted);padding:24px">⏳ Chargement...</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -351,6 +368,29 @@ tr:hover td{background:#FAFBFF}
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeModal('modalCompany')">Annuler</button>
       <button class="btn-save" onclick="saveCompany()">💾 Créer l'entreprise</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL NÉGOCIANT -->
+<div class="modal-bg" id="modalNegociant">
+  <div class="modal">
+    <div class="modal-title">Ajouter une agence négociant</div>
+    <div class="form-group">
+      <label class="form-lbl">Nom de l'agence</label>
+      <input class="form-in" id="negAgence" type="text" placeholder="ex: NOZ Brioude">
+    </div>
+    <div class="form-group">
+      <label class="form-lbl">Email de connexion</label>
+      <input class="form-in" id="negEmail" type="email" placeholder="agence@exemple.fr">
+    </div>
+    <div class="form-group">
+      <label class="form-lbl">Mot de passe / code d'accès</label>
+      <input class="form-in" id="negPwd" type="text" placeholder="Mot de passe temporaire">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal('modalNegociant')">Annuler</button>
+      <button class="btn-save" onclick="saveNegociant()">💾 Créer l'agence</button>
     </div>
   </div>
 </div>
@@ -447,7 +487,79 @@ function switchDashView(view, el) {
   if (el) el.classList.add("active");
   document.getElementById("viewDashSalaries").style.display = view === "salaries" ? "block" : "none";
   document.getElementById("viewDashCompanies").style.display = view === "companies" ? "block" : "none";
+  document.getElementById("viewDashNegociants").style.display = view === "negociants" ? "block" : "none";
   if (view === "companies") renderCompaniesSection();
+  if (view === "negociants") loadNegociants();
+}
+
+// ── NÉGOCIANTS (super admin) ──
+async function loadNegociants() {
+  var body = document.getElementById("negociantsBody");
+  if (!body) return;
+  try {
+    var { data, error } = await supabase.rpc('list_negociants_admin');
+    if (error) throw error;
+    var list = Array.isArray(data) ? data : [];
+    if (list.length === 0) {
+      body.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:24px">Aucune agence négociant — cliquez sur "+ Nouvelle agence"</td></tr>';
+      return;
+    }
+    var baseUrl = window.location.origin + window.location.pathname.replace(/admin-supabase-final\.html$/, "");
+    body.innerHTML = list.map(function(n) {
+      var link = baseUrl + "negociant_8.html?nego=" + encodeURIComponent(n.agence);
+      return '<tr>'+
+        '<td>'+esc(n.agence)+'</td>'+
+        '<td>'+esc(n.email||"—")+'</td>'+
+        '<td><code style="font-size:10px;word-break:break-all">'+esc(link)+'</code></td>'+
+        '<td><button class="btn-tbl" onclick="copyNegociantLink(\''+link.replace(/'/g,"\\'")+'\')">📋 Copier</button></td>'+
+      '</tr>';
+    }).join("");
+  } catch(e) {
+    console.error("loadNegociants error", e);
+    body.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:24px">⚠️ Erreur de chargement</td></tr>';
+  }
+}
+
+function copyNegociantLink(link) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(link).then(function(){ alert("✅ Lien copié"); }).catch(function(){ prompt("Copie manuelle du lien :", link); });
+  } else {
+    prompt("Copie manuelle du lien :", link);
+  }
+}
+
+function openAddNegociant() {
+  document.getElementById("negAgence").value = "";
+  document.getElementById("negEmail").value = "";
+  document.getElementById("negPwd").value = "";
+  document.getElementById("modalNegociant").classList.add("open");
+}
+
+async function saveNegociant() {
+  var agence = document.getElementById("negAgence").value.trim();
+  var email = document.getElementById("negEmail").value.trim();
+  var pwd = document.getElementById("negPwd").value;
+  if (!agence || !email || !pwd) { alert("Tous les champs sont obligatoires."); return; }
+  var btn = document.querySelector('#modalNegociant .btn-save');
+  if (btn) { btn.disabled = true; btn.textContent = "Création..."; }
+  try {
+    var { data: { session } } = await supabase.auth.getSession();
+    var res = await fetch(SUPABASE_URL + "/functions/v1/create-negociant", {
+      method: "POST",
+      headers: { "Authorization": "Bearer " + session.access_token, "Content-Type": "application/json" },
+      body: JSON.stringify({ agence: agence, email: email, password: pwd })
+    });
+    var result = await res.json();
+    if (btn) { btn.disabled = false; btn.textContent = "💾 Créer l'agence"; }
+    if (!res.ok) { alert("❌ Erreur : " + (result.error || "création impossible")); return; }
+  } catch(e) {
+    if (btn) { btn.disabled = false; btn.textContent = "💾 Créer l'agence"; }
+    alert("❌ Erreur lors de la création : " + e.message);
+    return;
+  }
+  closeModal("modalNegociant");
+  loadNegociants();
+  alert("✅ Agence créée !\n\nIdentifiants à transmettre :\nEmail : " + email + "\nMot de passe : " + pwd + "\n\nLien de connexion copié dans la liste des agences.");
 }
 
 function renderCompaniesSection() {
