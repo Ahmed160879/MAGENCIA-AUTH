@@ -158,6 +158,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);display:flex;flex-direc
   <div class="hdr-right">
     <div class="hdr-nego" id="hdrNego">—</div>
     <div class="hdr-clock" id="hdrClock">--:--:--</div>
+    <div id="hdrPwdLink" class="hidden" style="font-size:10px;color:rgba(255,255,255,0.55);text-decoration:underline;cursor:pointer;margin-top:3px" onclick="goToChangePasswordNego()">🔑 Mot de passe</div>
   </div>
 </div>
 
@@ -423,6 +424,7 @@ async function loginNego() {
   document.getElementById("hdrNego").textContent = nego;
   document.getElementById("sLogin").classList.add("hidden");
   document.getElementById("tabBar").classList.remove("hidden");
+  document.getElementById("hdrPwdLink").classList.remove("hidden");
   document.getElementById("sScan").classList.remove("hidden");
   // Focus le champ de saisie manuelle : permet à un lecteur de code-barres/QR USB
   // (qui se comporte comme un clavier) de scanner directement sans clic préalable.
@@ -768,11 +770,24 @@ async function logout() {
   currentNego = null;
   document.getElementById("loginPwd").value = "";
   document.getElementById("tabBar").classList.add("hidden");
+  document.getElementById("hdrPwdLink").classList.add("hidden");
   document.getElementById("sScan").classList.add("hidden");
   document.getElementById("sHistorique").classList.add("hidden");
   document.getElementById("sDemandesNego").classList.add("hidden");
   document.getElementById("sLogin").classList.remove("hidden");
   await supabase.auth.signOut();
+}
+
+// Raccourci depuis l'en-tête (visible sur tous les écrans une fois connecté)
+// pour aller directement changer son mot de passe, sans devoir chercher
+// dans quel onglet il se trouve.
+function goToChangePasswordNego() {
+  var historiqueTab = document.querySelectorAll(".tab")[1];
+  switchTab("historique", historiqueTab);
+  setTimeout(function() {
+    var el = document.getElementById("newPwdNego1");
+    if (el) { el.scrollIntoView({behavior:"smooth", block:"center"}); el.focus(); }
+  }, 100);
 }
 
 // ── MOT DE PASSE OUBLIÉ ──
