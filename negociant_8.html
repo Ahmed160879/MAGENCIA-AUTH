@@ -456,7 +456,7 @@ async function markDemandeTraiteeNego(id) {
 async function showResult(code) {
   currentPassageCode = code;
   currentPassageId = null;
-  var user = null, ok = false, serverOk = false;
+  var user = null, ok = false, serverOk = false, motif = null;
   try {
     var { data, error } = await supabase.rpc('log_passage', { p_code: code, p_agence: currentNego });
     if (error) throw error;
@@ -465,6 +465,7 @@ async function showResult(code) {
       serverOk = true;
       currentPassageId = row.passage_id;
       ok = row.resultat === "AUTORISE";
+      motif = row.motif || null;
       if (row.code) {
         user = { code: row.code, nom: row.nom, poste: row.poste, type: row.type, statut: row.statut, chantiers: row.chantiers };
       }
@@ -488,7 +489,15 @@ async function showResult(code) {
   document.getElementById("verdict").className = "verdict " + (ok ? "ok" : "ko");
   document.getElementById("vIcon").textContent = ok ? "✅" : "🚫";
   document.getElementById("vText").textContent = ok ? "AUTORISÉ" : "REFUSÉ";
-  document.getElementById("vSub").textContent = ok ? "Salarié autorisé à passer commande" : (!user ? "Code non reconnu" : user.statut === "INACTIF" ? "Compte inactif" : "Aucun chantier autorisé");
+  var motifLabels = {
+    code_inconnu: "Code non reconnu",
+    entreprise_desactivee: "Entreprise désactivée",
+    salarie_inactif: "Compte inactif",
+    aucun_chantier: "Aucun chantier autorisé"
+  };
+  document.getElementById("vSub").textContent = ok
+    ? "Salarié autorisé à passer commande"
+    : (motifLabels[motif] || (!user ? "Code non reconnu" : user.statut === "INACTIF" ? "Compte inactif" : "Aucun chantier autorisé"));
   document.getElementById("dCompany").textContent = companyName;
   document.getElementById("dName").textContent = user ? user.nom : "Inconnu";
   document.getElementById("dSub").textContent = user ? user.poste : "—";
