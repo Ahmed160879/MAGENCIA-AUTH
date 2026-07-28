@@ -355,7 +355,11 @@ tr:hover td{background:#FAFBFF}
     </div>
     <div class="form-group">
       <label class="form-lbl">Préfixe des codes salariés</label>
-      <input class="form-in" id="companyPrefix" type="text" placeholder="ex: MAR" style="text-transform:uppercase;letter-spacing:2px;font-family:monospace" maxlength="4">
+      <input class="form-in" id="companyPrefix" type="text" placeholder="ex: MAR" style="text-transform:uppercase;letter-spacing:2px;font-family:monospace" maxlength="6">
+    </div>
+    <div class="form-group">
+      <label class="form-lbl">Numéro SIRET</label>
+      <input class="form-in" id="companySiret" type="text" placeholder="123 456 789 00012" maxlength="17" inputmode="numeric">
     </div>
     <div class="form-group">
       <label class="form-lbl">Email admin</label>
@@ -379,6 +383,10 @@ tr:hover td{background:#FAFBFF}
     <div class="form-group">
       <label class="form-lbl">Nom de l'agence</label>
       <input class="form-in" id="negAgence" type="text" placeholder="ex: NOZ Brioude">
+    </div>
+    <div class="form-group">
+      <label class="form-lbl">Numéro SIRET</label>
+      <input class="form-in" id="negSiret" type="text" placeholder="123 456 789 00012" maxlength="17" inputmode="numeric">
     </div>
     <div class="form-group">
       <label class="form-lbl">Email de connexion</label>
@@ -417,6 +425,14 @@ function esc(v) {
   return String(v == null ? "" : v)
     .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
     .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+}
+
+// Un SIRET valide fait 14 chiffres (espaces ignorés, ex: "123 456 789 00012").
+function normalizeSiret(raw) {
+  return String(raw || "").replace(/\s+/g, "");
+}
+function isValidSiret(siret) {
+  return /^[0-9]{14}$/.test(siret);
 }
 
 async function login() {
@@ -558,6 +574,7 @@ function copyNegociantLink(link) {
 
 function openAddNegociant() {
   document.getElementById("negAgence").value = "";
+  document.getElementById("negSiret").value = "";
   document.getElementById("negEmail").value = "";
   document.getElementById("negPwd").value = "";
   document.getElementById("modalNegociant").classList.add("open");
@@ -565,9 +582,11 @@ function openAddNegociant() {
 
 async function saveNegociant() {
   var agence = document.getElementById("negAgence").value.trim();
+  var siret = normalizeSiret(document.getElementById("negSiret").value);
   var email = document.getElementById("negEmail").value.trim();
   var pwd = document.getElementById("negPwd").value;
-  if (!agence || !email || !pwd) { alert("Tous les champs sont obligatoires."); return; }
+  if (!agence || !siret || !email || !pwd) { alert("Tous les champs sont obligatoires (y compris le SIRET)."); return; }
+  if (!isValidSiret(siret)) { alert("❌ Le numéro SIRET doit contenir 14 chiffres."); return; }
   var btn = document.querySelector('#modalNegociant .btn-save');
   if (btn) { btn.disabled = true; btn.textContent = "Création..."; }
   try {
@@ -575,7 +594,7 @@ async function saveNegociant() {
     var res = await fetch(SUPABASE_URL + "/functions/v1/create-negociant", {
       method: "POST",
       headers: { "Authorization": "Bearer " + session.access_token, "Content-Type": "application/json" },
-      body: JSON.stringify({ agence: agence, email: email, password: pwd })
+      body: JSON.stringify({ agence: agence, siret: siret, email: email, password: pwd })
     });
     var result = await res.json();
     if (btn) { btn.disabled = false; btn.textContent = "💾 Créer l'agence"; }
@@ -849,6 +868,7 @@ function unsubscribeEntreprises() {
 function openAddCompany() {
   document.getElementById("companyNom").value = "";
   document.getElementById("companyPrefix").value = "";
+  document.getElementById("companySiret").value = "";
   document.getElementById("companyEmail").value = "";
   document.getElementById("companyPwd").value = "";
   document.getElementById("modalCompany").classList.add("open");
@@ -857,9 +877,11 @@ function openAddCompany() {
 async function saveCompany() {
   var nom = document.getElementById("companyNom").value.trim();
   var prefix = document.getElementById("companyPrefix").value.trim().toUpperCase();
+  var siret = normalizeSiret(document.getElementById("companySiret").value);
   var email = document.getElementById("companyEmail").value.trim();
   var pwd = document.getElementById("companyPwd").value;
-  if (!nom || !prefix || !email || !pwd) { alert("Tous les champs sont obligatoires (y compris email et mot de passe admin)."); return; }
+  if (!nom || !prefix || !siret || !email || !pwd) { alert("Tous les champs sont obligatoires (y compris SIRET, email et mot de passe admin)."); return; }
+  if (!isValidSiret(siret)) { alert("❌ Le numéro SIRET doit contenir 14 chiffres."); return; }
   var prefixTaken = COMPANIES.some(function(c){ return String(c.prefix||"").toUpperCase() === prefix; });
   if (prefixTaken) { alert("❌ Ce préfixe (\"" + prefix + "\") est déjà utilisé par une autre entreprise. Choisis-en un différent."); return; }
   var btn = document.querySelector('#modalCompany .btn-save');
@@ -869,12 +891,12 @@ async function saveCompany() {
     var res = await fetch(SUPABASE_URL + "/functions/v1/create-company", {
       method: "POST",
       headers: { "Authorization": "Bearer " + session.access_token, "Content-Type": "application/json" },
-      body: JSON.stringify({ nom: nom, prefix: prefix, email: email, password: pwd })
+      body: JSON.stringify({ nom: nom, prefix: prefix, siret: siret, email: email, password: pwd })
     });
     var result = await res.json();
     if (btn) { btn.disabled = false; btn.textContent = "💾 Créer l'entreprise"; }
     if (!res.ok) { alert("❌ Erreur : " + (result.error || "création impossible")); return; }
-    COMPANIES.push({id: result.id, nom:nom, prefix:prefix, email_admin:email});
+    COMPANIES.push({id: result.id, nom:nom, prefix:prefix, siret:siret, email_admin:email});
   } catch(e) {
     if (btn) { btn.disabled = false; btn.textContent = "💾 Créer l'entreprise"; }
     alert("❌ Erreur lors de la création : " + e.message);
