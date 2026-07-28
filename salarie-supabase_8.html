@@ -108,6 +108,8 @@ textarea.dmd-in{resize:none;min-height:80px}
 .dmd-item-statut.traitee{background:var(--green-bg,#EDFBF3);color:var(--green)}
 .dmd-item-msg{font-size:12px;color:#374151}
 .dmd-item-meta{font-size:11px;color:var(--muted)}
+.dmd-item-reponse{font-size:12px;color:var(--navy);background:var(--green-bg,#EDFBF3);border-radius:10px;padding:9px 12px;margin-top:2px;line-height:1.4}
+.dmd-item-reponse strong{display:block;font-size:9px;text-transform:uppercase;letter-spacing:0.6px;color:var(--green);margin-bottom:3px;font-weight:800}
 </style>
 </head>
 <body>
@@ -441,6 +443,7 @@ async function loadMesDemandes() {
         '</div>'+
         '<div class="dmd-item-msg">'+esc(d.message)+'</div>'+
         '<div class="dmd-item-meta">'+date+(d.chantier?' · 🏗️ '+esc(d.chantier):'')+'</div>'+
+        (d.reponse ? '<div class="dmd-item-reponse"><strong>Réponse du négociant</strong>'+esc(d.reponse)+'</div>' : '')+
       '</div>';
     }).join("");
   } catch(e) {

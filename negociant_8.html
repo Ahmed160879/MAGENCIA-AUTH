@@ -137,6 +137,12 @@ body{font-family:'Inter',sans-serif;background:var(--bg);display:flex;flex-direc
 .dmn-msg{font-size:13px;color:#374151;font-weight:600}
 .dmn-meta{font-size:11px;color:var(--muted)}
 .dmn-btn{align-self:flex-start;margin-top:2px;padding:6px 12px;border:1.5px solid var(--border);background:transparent;border-radius:8px;font-size:11px;font-weight:700;color:var(--navy);cursor:pointer}
+.dmn-reply-box{display:flex;flex-direction:column;gap:6px;margin-top:4px}
+.dmn-reply-in{width:100%;padding:10px 12px;border:2px solid var(--border);border-radius:10px;font-size:13px;font-family:inherit;color:var(--navy);background:var(--white);resize:vertical;min-height:56px;-webkit-appearance:none}
+.dmn-reply-in:focus{outline:none;border-color:var(--gold)}
+.dmn-reply-btn{align-self:flex-end;padding:8px 14px;background:var(--navy);color:white;border:none;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer}
+.dmn-reponse{font-size:12px;color:var(--navy);background:var(--green-bg);border-radius:10px;padding:9px 12px;margin-top:2px;line-height:1.4}
+.dmn-reponse strong{display:block;font-size:9px;text-transform:uppercase;letter-spacing:0.6px;color:var(--green);margin-bottom:3px;font-weight:800}
 
 /* ÉCRAN LARGE (ordinateur / tablette) */
 @media (min-width:900px){
@@ -527,6 +533,13 @@ async function loadDemandesNego() {
     list.innerHTML = demandes.map(function(d) {
       var date = d.created_at ? new Date(d.created_at).toLocaleDateString("fr-FR") + " " + new Date(d.created_at).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"}) : "—";
       var traitee = d.statut === "traitee";
+      var replyBlock = traitee
+        ? (d.reponse ? '<div class="dmn-reponse"><strong>Votre réponse</strong>'+esc(d.reponse)+'</div>' : '')
+        : ('<div class="dmn-reply-box">'+
+            '<textarea class="dmn-reply-in" id="dmnReponse'+d.id+'" placeholder="Votre réponse (ex : disponible, prêt le...)"></textarea>'+
+            '<div class="err" id="dmnReponseErr'+d.id+'" style="display:none;margin-top:0;max-width:none"></div>'+
+            '<button class="dmn-reply-btn" onclick="repondreDemandeNego('+d.id+')">✓ Envoyer la réponse</button>'+
+          '</div>');
       return '<div class="dmn-item">'+
         '<div class="dmn-top">'+
           '<div class="dmn-salarie">'+esc(d.nom_salarie||d.code_salarie)+'</div>'+
@@ -534,7 +547,7 @@ async function loadDemandesNego() {
         '</div>'+
         '<div class="dmn-msg">'+esc(d.message)+'</div>'+
         '<div class="dmn-meta">'+date+(d.chantier?' · 🏗️ '+esc(d.chantier):'')+' · '+esc(d.code_salarie)+'</div>'+
-        (traitee ? '' : '<button class="dmn-btn" onclick="markDemandeTraiteeNego('+d.id+')">✓ Marquer traitée</button>')+
+        replyBlock+
       '</div>';
     }).join("");
   } catch(e) {
@@ -543,11 +556,24 @@ async function loadDemandesNego() {
   }
 }
 
-async function markDemandeTraiteeNego(id) {
+async function repondreDemandeNego(id) {
+  var ta = document.getElementById("dmnReponse" + id);
+  var errEl = document.getElementById("dmnReponseErr" + id);
+  var text = ta ? ta.value.trim() : "";
+  if (errEl) errEl.style.display = "none";
+  if (!text) {
+    if (errEl) { errEl.textContent = "❌ Écrivez une réponse avant d'envoyer"; errEl.style.display = "block"; }
+    return;
+  }
   try {
-    var { error } = await supabase.rpc('mark_demande_traitee', { p_id: id });
+    var { data, error } = await supabase.rpc('repondre_demande', { p_id: id, p_reponse: text });
     if (error) throw error;
-  } catch(e) { console.error("markDemandeTraiteeNego error", e); }
+    if (data !== true) throw new Error("échec");
+  } catch(e) {
+    console.error("repondreDemandeNego error", e);
+    if (errEl) { errEl.textContent = "❌ Échec de l'envoi, réessayez"; errEl.style.display = "block"; }
+    return;
+  }
   loadDemandesNego();
 }
 
