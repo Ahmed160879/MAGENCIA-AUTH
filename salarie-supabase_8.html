@@ -9,28 +9,28 @@
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-:root{--navy:#0F1F3D;--gold:#D4A843;--bg:#F2F4F8;--white:#fff;--green:#0CAF60;--red:#E53935;--muted:#7B8BAD;--border:#E4E8F0;--shadow:0 2px 20px rgba(15,31,61,0.10)}
+:root{--navy:#10203D;--navy2:#182A4C;--orange:#FF6A1A;--orange-dark:#E4580D;--orange-soft:#FFE7D6;--bg:#F5F6F8;--white:#fff;--green:#0CAF60;--red:#E53935;--muted:#667085;--border:#E6E8EC;--shadow:0 2px 20px rgba(16,32,61,0.10)}
 html,body{height:100%;overflow:hidden}
 body{font-family:'Inter',sans-serif;background:var(--bg);display:flex;flex-direction:column;max-width:430px;margin:0 auto}
 .safe-top{height:env(safe-area-inset-top,44px);background:var(--navy)}
 .safe-bot{height:env(safe-area-inset-bottom,20px)}
 .hdr{background:var(--navy);padding:10px 20px 14px;display:flex;align-items:center;justify-content:space-between}
-.logo{font-size:17px;font-weight:800;color:#fff}.logo em{color:var(--gold);font-style:normal}
+.logo{font-size:17px;font-weight:800;color:#fff}.logo em{color:var(--orange);font-style:normal}
 .logo-sub{font-size:10px;color:rgba(255,255,255,0.35);letter-spacing:1.5px;text-transform:uppercase;margin-top:1px}
-.hdr-tag{background:rgba(212,168,67,0.15);border:1px solid rgba(212,168,67,0.3);color:var(--gold);font-size:10px;font-weight:700;padding:3px 10px;border-radius:20px}
+.hdr-tag{background:rgba(255,106,26,0.15);border:1px solid rgba(255,106,26,0.35);color:var(--orange);font-size:10px;font-weight:700;padding:3px 10px;border-radius:20px}
 .screen{flex:1;overflow-y:auto;display:flex;flex-direction:column}
 .hidden{display:none!important}
 
 /* LOGIN */
 #sLogin{align-items:center;justify-content:center;padding:28px 24px}
-.brand-mark{width:72px;height:72px;background:linear-gradient(135deg,var(--navy),#1a3260);border-radius:22px;display:flex;align-items:center;justify-content:center;font-size:32px;margin-bottom:20px;box-shadow:0 8px 28px rgba(15,31,61,0.22)}
+.brand-mark{width:72px;height:72px;background:linear-gradient(135deg,var(--navy),var(--navy2));border-radius:22px;display:flex;align-items:center;justify-content:center;font-size:32px;margin-bottom:20px;box-shadow:0 8px 28px rgba(16,32,61,0.22)}
 .login-h{font-size:24px;font-weight:800;color:var(--navy);text-align:center;letter-spacing:-0.5px;margin-bottom:6px}
 .login-p{font-size:14px;color:var(--muted);text-align:center;line-height:1.55;margin-bottom:28px;max-width:260px}
 .field{width:100%;max-width:300px;margin-bottom:10px}
 .field-lbl{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1.2px;margin-bottom:7px;display:block}
 .field-in{width:100%;padding:17px;border:2px solid var(--border);border-radius:14px;font-size:21px;font-weight:700;letter-spacing:4px;text-align:center;text-transform:uppercase;color:var(--navy);font-family:monospace;background:var(--white);-webkit-appearance:none}
-.field-in:focus{outline:none;border-color:var(--gold)}
-.btn{width:100%;max-width:300px;padding:17px;background:var(--navy);color:white;border:none;border-radius:14px;font-size:15px;font-weight:700;cursor:pointer}
+.field-in:focus{outline:none;border-color:var(--orange)}
+.btn{width:100%;max-width:300px;padding:17px;background:var(--orange);color:white;border:none;border-radius:14px;font-size:15px;font-weight:700;cursor:pointer}
 .btn:active{opacity:0.82}
 .btn:disabled{opacity:0.5}
 .err{max-width:300px;background:#FEE;color:#C62828;border-radius:12px;padding:11px 15px;font-size:13px;text-align:center;margin-top:8px;display:none;font-weight:500}
@@ -40,27 +40,24 @@ body{font-family:'Inter',sans-serif;background:var(--bg);display:flex;flex-direc
 
 /* CARTE */
 #sCarte{padding:14px;gap:12px}
-.id-card{background:linear-gradient(140deg,var(--navy),#1a3260);border-radius:18px;padding:20px;color:#fff;position:relative;overflow:hidden}
-.id-card::before{content:'';position:absolute;right:-15px;top:-15px;width:110px;height:110px;background:rgba(212,168,67,0.12);border-radius:50%}
-.ic-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
-.ic-badge{background:var(--gold);color:var(--navy);font-size:9px;font-weight:800;padding:4px 11px;border-radius:20px;letter-spacing:0.8px;text-transform:uppercase}
-.ic-live{display:flex;align-items:center;gap:5px;font-size:11px;color:rgba(255,255,255,0.6)}
-.live-dot{width:6px;height:6px;background:#34D399;border-radius:50%}
-.ic-body{display:flex;align-items:center;gap:14px}
-.ic-photo-wrap{flex-shrink:0}
-.ic-photo{width:92px;height:92px;border-radius:50%;border:3px solid rgba(255,255,255,0.3);background:rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:center;font-size:38px;position:relative;overflow:hidden}
-.ic-info{flex:1;min-width:0}
-.ic-company{font-size:10px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px}
-.ic-name{font-size:19px;font-weight:800;letter-spacing:-0.3px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.ic-poste{font-size:12px;opacity:.55;margin-bottom:4px}
-.ic-code{font-family:monospace;font-size:11px;opacity:.35;letter-spacing:2px}
+.id-card{background:var(--white);border-radius:24px;padding:30px 22px 24px;box-shadow:var(--shadow);display:flex;flex-direction:column;align-items:center;text-align:center}
+.ic-photo-wrap{margin-bottom:16px}
+.ic-photo{width:172px;height:172px;border-radius:28px;border:none;background:var(--orange-soft);display:flex;align-items:center;justify-content:center;font-size:64px;position:relative;overflow:hidden}
+.ic-name{font-size:22px;font-weight:800;color:var(--navy);letter-spacing:-0.3px;margin-bottom:4px}
+.ic-poste{font-size:12.5px;color:var(--muted);margin-bottom:4px}
+.ic-company{font-size:13px;color:var(--muted);margin-bottom:12px}
+.ic-badge{background:var(--bg);color:var(--muted);font-size:9px;font-weight:800;padding:4px 11px;border-radius:20px;letter-spacing:0.8px;text-transform:uppercase;margin-bottom:12px}
+.ic-status{display:inline-flex;align-items:center;gap:6px;font-size:13.5px;font-weight:700;padding:9px 20px;border-radius:20px;margin-bottom:10px}
+.ic-status.active{background:#EDFBF3;color:var(--green)}
+.ic-status.inactive{background:#FFF0F0;color:var(--red)}
+.ic-code{font-family:monospace;font-size:11px;color:var(--muted);opacity:.5;letter-spacing:2px}
 .qr-box{background:var(--white);border-radius:18px;padding:18px;display:flex;flex-direction:column;align-items:center;box-shadow:var(--shadow)}
 .qr-lbl{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1.2px;margin-bottom:12px}
 .qr-img{width:185px;height:185px;border-radius:10px}
 .qr-tip{margin-top:12px;font-size:12px;color:var(--muted);text-align:center;line-height:1.5}
 .ch-box{background:var(--white);border-radius:18px;padding:16px;box-shadow:var(--shadow)}
 .ch-lbl{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1.2px;margin-bottom:10px}
-.ch-pill{display:inline-flex;align-items:center;gap:5px;background:#EEF2FF;color:var(--navy);font-size:12px;font-weight:600;padding:6px 12px;border-radius:20px;margin:2px}
+.ch-pill{display:inline-flex;align-items:center;gap:5px;background:var(--orange-soft);color:var(--navy);font-size:12px;font-weight:600;padding:6px 12px;border-radius:20px;margin:2px}
 
 /* TABS */
 .tabs{display:flex;background:var(--white);border-radius:14px;padding:4px;margin:0 14px;box-shadow:var(--shadow);gap:4px}
@@ -69,7 +66,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);display:flex;flex-direc
 
 /* BL HISTORIQUE */
 #sBL{padding:14px;gap:12px}
-.bl-header-card{background:linear-gradient(135deg,var(--navy),#1a3260);border-radius:18px;padding:16px;color:white}
+.bl-header-card{background:linear-gradient(135deg,var(--navy),var(--navy2));border-radius:18px;padding:16px;color:white}
 .bl-header-name{font-size:16px;font-weight:800;margin-bottom:2px}
 .bl-header-sub{font-size:12px;opacity:0.6}
 .bl-stats{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -82,7 +79,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);display:flex;flex-direc
 .bl-item:last-child{border-bottom:none}
 .bl-item-top{display:flex;align-items:center;justify-content:space-between}
 .bl-item-nego{font-size:13px;font-weight:700;color:var(--navy)}
-.bl-item-num{font-family:monospace;font-size:12px;font-weight:700;color:var(--gold);background:#FFF8EC;padding:2px 8px;border-radius:6px}
+.bl-item-num{font-family:monospace;font-size:12px;font-weight:700;color:var(--orange-dark);background:var(--orange-soft);padding:2px 8px;border-radius:6px}
 .bl-item-num.empty{color:var(--muted);background:var(--bg)}
 .bl-item-meta{font-size:11px;color:var(--muted);display:flex;gap:8px}
 .bl-empty{text-align:center;padding:32px 20px;color:var(--muted)}
@@ -96,7 +93,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);display:flex;flex-direc
 .dmd-lbl{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1.2px;margin-bottom:7px;display:block;margin-top:14px}
 .dmd-lbl:first-child{margin-top:0}
 .dmd-in{width:100%;padding:12px 14px;border:2px solid var(--border);border-radius:12px;font-size:14px;color:var(--navy);background:var(--white);-webkit-appearance:none;font-family:inherit}
-.dmd-in:focus{outline:none;border-color:var(--gold)}
+.dmd-in:focus{outline:none;border-color:var(--orange)}
 textarea.dmd-in{resize:none;min-height:80px}
 .dmd-ok{background:#EDFBF3;color:#0CAF60;border-radius:12px;padding:11px 15px;font-size:13px;margin-top:12px;display:none;font-weight:600}
 .dmd-item{padding:11px 0;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:3px}
@@ -104,12 +101,10 @@ textarea.dmd-in{resize:none;min-height:80px}
 .dmd-item-top{display:flex;align-items:center;justify-content:space-between}
 .dmd-item-agence{font-size:13px;font-weight:700;color:var(--navy)}
 .dmd-item-statut{font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;text-transform:uppercase}
-.dmd-item-statut.nouvelle{background:#FFF8EC;color:#B45309}
+.dmd-item-statut.nouvelle{background:var(--orange-soft);color:var(--orange-dark)}
 .dmd-item-statut.traitee{background:var(--green-bg,#EDFBF3);color:var(--green)}
 .dmd-item-msg{font-size:12px;color:#374151}
 .dmd-item-meta{font-size:11px;color:var(--muted)}
-.dmd-item-reponse{font-size:12px;color:var(--navy);background:var(--green-bg,#EDFBF3);border-radius:10px;padding:9px 12px;margin-top:2px;line-height:1.4}
-.dmd-item-reponse strong{display:block;font-size:9px;text-transform:uppercase;letter-spacing:0.6px;color:var(--green);margin-bottom:3px;font-weight:800}
 </style>
 </head>
 <body>
@@ -183,24 +178,18 @@ textarea.dmd-in{resize:none;min-height:80px}
 <!-- CARTE -->
 <div class="screen hidden" id="sCarte">
   <div class="id-card">
-    <div class="ic-top">
-      <div class="ic-badge" id="icBadge">INTERNE</div>
-      <div class="ic-live"><div class="live-dot"></div>Actif</div>
-    </div>
-    <div class="ic-body">
-      <div class="ic-photo-wrap">
-        <div class="ic-photo" id="icPhoto">
-          <span id="icPhotoEmoji">👤</span>
-          <img id="icPhotoImg" src="" alt="" style="display:none;position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%">
-        </div>
-      </div>
-      <div class="ic-info">
-        <div class="ic-company" id="icCompany">—</div>
-        <div class="ic-name" id="icName">—</div>
-        <div class="ic-poste" id="icPoste">—</div>
-        <div class="ic-code" id="icCode">—</div>
+    <div class="ic-photo-wrap">
+      <div class="ic-photo" id="icPhoto">
+        <span id="icPhotoEmoji">👤</span>
+        <img id="icPhotoImg" src="" alt="" style="display:none;position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:28px">
       </div>
     </div>
+    <div class="ic-name" id="icName">—</div>
+    <div class="ic-poste" id="icPoste">—</div>
+    <div class="ic-company" id="icCompany">—</div>
+    <div class="ic-badge" id="icBadge">INTERNE</div>
+    <div class="ic-status" id="icStatus">—</div>
+    <div class="ic-code" id="icCode">—</div>
   </div>
   <div class="qr-box">
     <div class="qr-lbl">📱 À scanner chez le fournisseur</div>
@@ -443,7 +432,6 @@ async function loadMesDemandes() {
         '</div>'+
         '<div class="dmd-item-msg">'+esc(d.message)+'</div>'+
         '<div class="dmd-item-meta">'+date+(d.chantier?' · 🏗️ '+esc(d.chantier):'')+'</div>'+
-        (d.reponse ? '<div class="dmd-item-reponse"><strong>Réponse du négociant</strong>'+esc(d.reponse)+'</div>' : '')+
       '</div>';
     }).join("");
   } catch(e) {
@@ -652,10 +640,18 @@ function showCarte(user) {
   var companyName = user.entreprise || companyNames[prefix] || prefix;
 
   document.getElementById("icBadge").textContent = user.type === "INTERNE" ? "INTERNE" : (user.type === "INTERIMAIRE" ? "INTÉRIMAIRE" : "SOUS-TRAITANT");
-  document.getElementById("icCompany").textContent = companyName;
+  document.getElementById("icCompany").textContent = "Entreprise : " + companyName;
   document.getElementById("icName").textContent = user.nom;
   document.getElementById("icPoste").textContent = user.poste;
   document.getElementById("icCode").textContent = code;
+  var icStatusEl = document.getElementById("icStatus");
+  if (user.statut === "ACTIF") {
+    icStatusEl.textContent = "✓ ACTIF — Autorisé à retirer des marchandises";
+    icStatusEl.className = "ic-status active";
+  } else {
+    icStatusEl.textContent = "✗ INACTIF";
+    icStatusEl.className = "ic-status inactive";
+  }
   document.getElementById("blHeaderName").textContent = user.nom;
 
   // Photo gérée uniquement par l'admin de l'entreprise (non modifiable ici)
@@ -672,7 +668,7 @@ function showCarte(user) {
   var ch = Array.isArray(user.chantiers) ? user.chantiers : [];
   document.getElementById("chList").innerHTML = ch.map(function(c){return '<span class="ch-pill">🏗️ '+esc(c)+'</span>';}).join("") || '<span style="color:var(--red);font-size:13px">Aucun chantier autorisé</span>';
   // Le QR encode uniquement le code salarié (lu tel quel côté négociant, caméra ou lecteur USB)
-  document.getElementById("qrImg").src = "https://api.qrserver.com/v1/create-qr-code/?size=185x185&color=0F1F3D&bgcolor=ffffff&qzone=2&data=" + encodeURIComponent(code);
+  document.getElementById("qrImg").src = "https://api.qrserver.com/v1/create-qr-code/?size=185x185&color=10203D&bgcolor=ffffff&qzone=2&data=" + encodeURIComponent(code);
 
   document.getElementById("sLogin").classList.add("hidden");
   document.getElementById("sPin").classList.add("hidden");
