@@ -449,7 +449,18 @@ async function login() {
 
   if (currentUser.role !== "super_admin") {
     var myComp = COMPANIES.find(function(c){return c.id === currentUser.company_id;});
-    if (myComp && (myComp.statut === "en_attente" || myComp.statut === "inactif")) {
+    // Entreprise introuvable (supprimée entre-temps) : on bloque proprement
+    // plutôt que de retomber par erreur sur une autre entreprise.
+    if (!myComp) {
+      document.getElementById("screenLogin").style.display = "none";
+      document.getElementById("pendingIcon").textContent = "⚠️";
+      document.getElementById("pendingTitle").textContent = "Compte introuvable";
+      document.getElementById("pendingText").textContent = "Votre entreprise n'existe plus dans NégoceID. Contactez votre interlocuteur pour en savoir plus.";
+      document.getElementById("screenPending").style.display = "flex";
+      await supabase.auth.signOut();
+      return;
+    }
+    if (myComp.statut === "en_attente" || myComp.statut === "inactif") {
       document.getElementById("screenLogin").style.display = "none";
       if (myComp.statut === "inactif") {
         document.getElementById("pendingIcon").textContent = "⛔";
@@ -476,8 +487,11 @@ async function login() {
     if (COMPANIES.length > 0) selectCompany(COMPANIES[0]);
     subscribeToEntreprises();
   } else {
+    // À ce stade, myComp (ci-dessus) a déjà garanti que l'entreprise existe
+    // bel et bien : pas de fallback sur COMPANIES[0] ici, ce serait montrer
+    // les données d'une autre entreprise.
     var comp = COMPANIES.find(function(c){return c.id === currentUser.company_id;});
-    selectCompany(comp || COMPANIES[0]);
+    if (comp) selectCompany(comp);
   }
 }
 
