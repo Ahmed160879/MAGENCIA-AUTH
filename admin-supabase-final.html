@@ -618,7 +618,7 @@ function renderCompaniesSection() {
     } else {
       actionBtn = '<button class="btn-tbl" onclick="setCompanyStatut(\''+c.id+'\',\'actif\')">🟢 Réactiver</button>';
     }
-    var isMagencia = String(c.prefix||"").toUpperCase() === "MAG";
+    var isMagencia = c.id === "magencia";
     var deleteBtn = isMagencia ? "" : '<button class="btn-tbl danger" onclick="deleteCompany(\''+c.id+'\',\''+esc(c.nom).replace(/'/g,"\\'")+'\')" title="Supprimer définitivement">🗑️</button>';
     return '<tr>'+
       '<td>'+esc(c.nom)+'</td>'+
@@ -860,6 +860,8 @@ async function saveCompany() {
   var email = document.getElementById("companyEmail").value.trim();
   var pwd = document.getElementById("companyPwd").value;
   if (!nom || !prefix || !email || !pwd) { alert("Tous les champs sont obligatoires (y compris email et mot de passe admin)."); return; }
+  var prefixTaken = COMPANIES.some(function(c){ return String(c.prefix||"").toUpperCase() === prefix; });
+  if (prefixTaken) { alert("❌ Ce préfixe (\"" + prefix + "\") est déjà utilisé par une autre entreprise. Choisis-en un différent."); return; }
   var btn = document.querySelector('#modalCompany .btn-save');
   if (btn) { btn.disabled = true; btn.textContent = "Création..."; }
   try {
@@ -888,8 +890,7 @@ async function saveCompany() {
 async function loadData() {
   if (!currentCompany) return;
   try {
-    var prefix = currentCompany.prefix;
-    var { data, error } = await supabase.from('salaries').select('*').like('code', prefix + '-*').order('nom');
+    var { data, error } = await supabase.from('salaries').select('*').eq('company_id', currentCompany.id).order('nom');
     if (error) throw error;
     salaries = Array.isArray(data) ? data : [];
   } catch(e) {
@@ -900,14 +901,7 @@ async function loadData() {
     ];
   }
   try {
-    var prefix2 = currentCompany.prefix;
-    var query = supabase.from('passages').select('*').order('created_at', {ascending:false}).limit(50);
-    if (prefix2 === "MAG") {
-      query = query.or('code_salarie.like.MAG-*,code_salarie.like.EXT-*');
-    } else {
-      query = query.like('code_salarie', prefix2 + '-*');
-    }
-    var { data: pdata, error: perr } = await query;
+    var { data: pdata, error: perr } = await supabase.from('passages').select('*').eq('company_id', currentCompany.id).order('created_at', {ascending:false}).limit(50);
     if (perr) throw perr;
     passages = Array.isArray(pdata) ? pdata : [];
   } catch(e) { passages = []; }
@@ -1107,7 +1101,8 @@ async function saveSalarie() {
   var statut = document.getElementById("salStatut").value;
   var chantiers = document.getElementById("salChantiers").value.split(",").map(function(c){return c.trim();}).filter(Boolean);
   if (!code || !nom) { alert("Code et nom obligatoires"); return; }
-  var data = {code:code, nom:nom, poste:poste, type:type, statut:statut, chantiers:chantiers, photo:salPhotoData};
+  if (!currentCompany) { alert("Aucune entreprise sélectionnée"); return; }
+  var data = {code:code, nom:nom, poste:poste, type:type, statut:statut, chantiers:chantiers, photo:salPhotoData, company_id: currentCompany.id};
   try {
     var isEdit = document.getElementById("salEditId").value;
     if (isEdit) {
