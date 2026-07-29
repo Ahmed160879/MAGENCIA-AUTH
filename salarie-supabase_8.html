@@ -131,9 +131,20 @@ textarea.dmd-in{resize:none;min-height:80px}
   <div class="hidden" id="loginFaceIdHint" style="width:100%;max-width:300px;text-align:center;margin-top:6px">
     <span style="font-size:13px;color:var(--muted);cursor:pointer;text-decoration:underline" onclick="quickFaceIdLogin()">🆔 Utiliser Face ID / Touch ID à la place</span>
   </div>
+  <div style="text-align:center;margin-top:14px">
+    <span style="font-size:13px;color:var(--muted);cursor:pointer;text-decoration:underline" onclick="showForgotSalarie()">Mot de passe oublié ?</span>
+  </div>
   <div class="err" id="err">❌ Identifiant ou mot de passe incorrect</div>
   <div class="loading" id="loading">⏳ Vérification...</div>
   <div class="hint">Première connexion ? Le mot de passe que vous saisissez devient votre mot de passe personnel.</div>
+</div>
+
+<!-- MOT DE PASSE OUBLIÉ -->
+<div class="screen hidden" id="sForgotSalarie" style="align-items:center;justify-content:center;padding:28px 24px">
+  <div class="brand-mark">🔑</div>
+  <div class="login-h">Mot de passe oublié</div>
+  <div class="login-p">Pour des raisons de sécurité, seul le responsable de votre entreprise peut réinitialiser votre mot de passe. Contactez-le : il pourra le faire depuis son espace admin, et vous pourrez ensuite en choisir un nouveau à votre prochaine connexion.</div>
+  <button class="btn" onclick="backToLoginSalarie()">← Retour à la connexion</button>
 </div>
 
 <!-- Proposition d'activation Face ID / Touch ID (juste après la création du PIN) -->
@@ -411,6 +422,16 @@ async function loadMesDemandes() {
   }
 }
 
+function showForgotSalarie() {
+  document.getElementById("sLogin").classList.add("hidden");
+  document.getElementById("sForgotSalarie").classList.remove("hidden");
+}
+
+function backToLoginSalarie() {
+  document.getElementById("sForgotSalarie").classList.add("hidden");
+  document.getElementById("sLogin").classList.remove("hidden");
+}
+
 // L'identifiant peut être le code (MAG-XXXXXX), un email ou un numéro
 // de téléphone (negoceid-53). resolve_salarie_identifiant() retrouve
 // le code interne correspondant — c'est ce code qui reste utilisé
@@ -639,6 +660,7 @@ function out() {
   document.getElementById("loginFaceIdHint").classList.add("hidden");
   document.getElementById("sLogin").classList.remove("hidden");
   document.getElementById("sFaceIdOffer").classList.add("hidden");
+  document.getElementById("sForgotSalarie").classList.add("hidden");
   document.getElementById("tabBar").classList.add("hidden");
   document.getElementById("sCarte").classList.add("hidden");
   document.getElementById("sBL").classList.add("hidden");
