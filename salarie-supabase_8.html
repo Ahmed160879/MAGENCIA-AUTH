@@ -278,19 +278,12 @@ var currentCode = null;
 var pendingUser = null;
 var pinMode = null;
 
-var DEMO = {
-  "MAG-384729":{nom:"EL MRABET Ahmed",poste:"Gérant",type:"INTERNE",statut:"ACTIF",chantiers:["NOZ Brioude","Patriarca","Carter Cash Angoulins","Stow Your Bags"]},
-  "MAG-582341":{nom:"DUPONT Vincent",poste:"Chef de chantier",type:"INTERNE",statut:"ACTIF",chantiers:["Carter Cash Angoulins","Stow Your Bags"]},
-  "EXT-114872":{nom:"MARTIN Paul",poste:"Sous-traitant",type:"EXT",statut:"ACTIF",chantiers:["Stow Your Bags"]},
-  "EXT-203541":{nom:"GARCIA Luis",poste:"Sous-traitant",type:"EXT",statut:"INACTIF",chantiers:[]}
-};
-
 async function fetchSalarie(code) {
   try {
     var { data, error } = await supabase.rpc('get_salarie_by_code', { p_code: code });
     if (!error && Array.isArray(data) && data.length > 0) return data[0];
   } catch(e) { console.error("fetchSalarie error", e); }
-  return DEMO[code] ? Object.assign({code: code}, DEMO[code]) : null;
+  return null;
 }
 
 async function loadBL() {

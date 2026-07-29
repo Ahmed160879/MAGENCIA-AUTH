@@ -333,7 +333,7 @@ tr:hover td{background:#FAFBFF}
     </div>
     <div class="form-group">
       <label class="form-lbl">Chantiers autorisés (séparés par virgule)</label>
-      <input class="form-in" id="salChantiers" type="text" placeholder="NOZ Brioude, Patriarca, Carter Cash">
+      <input class="form-in" id="salChantiers" type="text" placeholder="Nom du chantier 1, Nom du chantier 2">
     </div>
     <div class="qr-preview" id="qrPreview" style="display:none">
       <img id="qrPreviewImg" src="" alt="QR">
@@ -383,7 +383,7 @@ tr:hover td{background:#FAFBFF}
     <div class="modal-title">Ajouter une agence négociant</div>
     <div class="form-group">
       <label class="form-lbl">Nom de l'agence</label>
-      <input class="form-in" id="negAgence" type="text" placeholder="ex: NOZ Brioude">
+      <input class="form-in" id="negAgence" type="text" placeholder="Nom de l'agence">
     </div>
     <div class="form-group">
       <label class="form-lbl">Numéro SIRET</label>
@@ -1025,11 +1025,8 @@ async function loadData() {
     if (error) throw error;
     salaries = Array.isArray(data) ? data : [];
   } catch(e) {
-    salaries = [
-      {code:"MAG-384729",nom:"EL MRABET Ahmed",poste:"Gérant",type:"INTERNE",statut:"ACTIF",chantiers:["NOZ Brioude","Patriarca","Carter Cash","Stow Your Bags"]},
-      {code:"MAG-582341",nom:"DUPONT Vincent",poste:"Chef de chantier",type:"INTERNE",statut:"ACTIF",chantiers:["Carter Cash","Stow Your Bags"]},
-      {code:"EXT-114872",nom:"MARTIN Paul",poste:"Sous-traitant",type:"EXT",statut:"ACTIF",chantiers:["Stow Your Bags"]},
-    ];
+    console.error("loadData salaries error", e);
+    salaries = [];
   }
   try {
     var { data: pdata, error: perr } = await supabase.from('passages').select('*').eq('company_id', currentCompany.id).order('created_at', {ascending:false}).limit(50);
