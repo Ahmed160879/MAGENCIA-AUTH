@@ -260,7 +260,7 @@ tr:hover td{background:#FAFBFF}
         <div class="section-title">🏢 Entreprises clientes</div>
       </div>
       <div class="filter-row">
-        <input class="filter-select" id="companySearch" type="text" placeholder="🔎 Rechercher une entreprise (nom, email, préfixe)..." style="flex:1;min-width:260px" oninput="renderCompaniesSection()">
+        <input class="filter-select" id="companySearch" type="text" placeholder="🔎 Rechercher une entreprise (nom, email, préfixe, SIRET)..." style="flex:1;min-width:260px" oninput="renderCompaniesSection()">
       </div>
       <table>
         <thead><tr><th>Entreprise</th><th>Email</th><th>Préfixe</th><th>Statut</th><th>Action</th></tr></thead>
@@ -618,11 +618,13 @@ function renderCompaniesSection() {
   if (!body) return;
   var searchEl = document.getElementById("companySearch");
   var q = searchEl ? searchEl.value.trim().toLowerCase() : "";
+  var qSiret = q.replace(/\s+/g, "");
   var filtered = COMPANIES.filter(function(c) {
     if (!q) return true;
     return (c.nom||"").toLowerCase().indexOf(q) !== -1
       || (c.email_admin||"").toLowerCase().indexOf(q) !== -1
-      || (c.prefix||"").toLowerCase().indexOf(q) !== -1;
+      || (c.prefix||"").toLowerCase().indexOf(q) !== -1
+      || (qSiret && (c.siret||"").replace(/\s+/g, "").indexOf(qSiret) !== -1);
   });
   if (filtered.length === 0) {
     body.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:24px">Aucune entreprise trouvée</td></tr>';
