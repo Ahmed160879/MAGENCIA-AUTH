@@ -317,6 +317,14 @@ tr:hover td{background:#FAFBFF}
       <input class="form-in" id="salPoste" type="text" placeholder="Chef de chantier">
     </div>
     <div class="form-group">
+      <label class="form-lbl">Email <span style="text-transform:none;font-weight:500;color:var(--muted)">(optionnel — permet de se connecter avec l'email)</span></label>
+      <input class="form-in" id="salEmail" type="email" placeholder="prenom.nom@exemple.fr" autocomplete="off">
+    </div>
+    <div class="form-group">
+      <label class="form-lbl">Téléphone <span style="text-transform:none;font-weight:500;color:var(--muted)">(optionnel — permet de se connecter avec le téléphone)</span></label>
+      <input class="form-in" id="salTelephone" type="tel" placeholder="06 12 34 56 78" autocomplete="off">
+    </div>
+    <div class="form-group">
       <label class="form-lbl">Type</label>
       <select class="form-in" id="salType">
         <option value="INTERNE">INTERNE</option>
@@ -1157,6 +1165,8 @@ function openAddSalarie() {
   document.getElementById("salCode").readOnly = false;
   document.getElementById("salNom").value = "";
   document.getElementById("salPoste").value = "";
+  document.getElementById("salEmail").value = "";
+  document.getElementById("salTelephone").value = "";
   document.getElementById("salType").value = "INTERNE";
   document.getElementById("salStatut").value = "ACTIF";
   document.getElementById("salChantiers").value = "";
@@ -1176,6 +1186,8 @@ function editSalarie(code) {
   document.getElementById("salCode").readOnly = true;
   document.getElementById("salNom").value = s.nom;
   document.getElementById("salPoste").value = s.poste;
+  document.getElementById("salEmail").value = s.email || "";
+  document.getElementById("salTelephone").value = s.telephone || "";
   document.getElementById("salType").value = s.type;
   document.getElementById("salStatut").value = s.statut;
   document.getElementById("salChantiers").value = (s.chantiers||[]).join(", ");
@@ -1225,20 +1237,36 @@ async function saveSalarie() {
   var code = document.getElementById("salCode").value.trim().toUpperCase();
   var nom = document.getElementById("salNom").value.trim();
   var poste = document.getElementById("salPoste").value.trim();
+  var email = document.getElementById("salEmail").value.trim() || null;
+  var telephone = document.getElementById("salTelephone").value.trim() || null;
   var type = document.getElementById("salType").value;
   var statut = document.getElementById("salStatut").value;
   var chantiers = document.getElementById("salChantiers").value.split(",").map(function(c){return c.trim();}).filter(Boolean);
   if (!code || !nom) { alert("Code et nom obligatoires"); return; }
   if (!currentCompany) { alert("Aucune entreprise sélectionnée"); return; }
-  var data = {code:code, nom:nom, poste:poste, type:type, statut:statut, chantiers:chantiers, photo:salPhotoData, company_id: currentCompany.id};
+  var data = {code:code, nom:nom, poste:poste, email:email, telephone:telephone, type:type, statut:statut, chantiers:chantiers, photo:salPhotoData, company_id: currentCompany.id};
   try {
     var isEdit = document.getElementById("salEditId").value;
     if (isEdit) {
-      var { error } = await supabase.from('salaries').update({nom:nom,poste:poste,type:type,statut:statut,chantiers:chantiers,photo:salPhotoData}).eq('code', code);
-      if (error) { console.error("saveSalarie update failed", error); alert("❌ Échec de la modification :\n" + error.message); return; }
+      var { error } = await supabase.from('salaries').update({nom:nom,poste:poste,email:email,telephone:telephone,type:type,statut:statut,chantiers:chantiers,photo:salPhotoData}).eq('code', code);
+      if (error) {
+        console.error("saveSalarie update failed", error);
+        var friendly = error.message.includes("duplicate key") && error.message.includes("email") ? "❌ Cet email est déjà utilisé par un autre salarié."
+          : error.message.includes("duplicate key") && error.message.includes("telephone") ? "❌ Ce téléphone est déjà utilisé par un autre salarié."
+          : "❌ Échec de la modification :\n" + error.message;
+        alert(friendly);
+        return;
+      }
     } else {
       var { error: error2 } = await supabase.from('salaries').insert(data);
-      if (error2) { console.error("saveSalarie insert failed", error2); alert("❌ Échec de l'ajout :\n" + error2.message); return; }
+      if (error2) {
+        console.error("saveSalarie insert failed", error2);
+        var friendly2 = error2.message.includes("duplicate key") && error2.message.includes("email") ? "❌ Cet email est déjà utilisé par un autre salarié."
+          : error2.message.includes("duplicate key") && error2.message.includes("telephone") ? "❌ Ce téléphone est déjà utilisé par un autre salarié."
+          : "❌ Échec de l'ajout :\n" + error2.message;
+        alert(friendly2);
+        return;
+      }
     }
   } catch(e) { console.error("saveSalarie error", e); alert("❌ Erreur :\n" + e.message); return; }
   closeModal("modalSalarie");

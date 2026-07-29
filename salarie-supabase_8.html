@@ -121,7 +121,7 @@ textarea.dmd-in{resize:none;min-height:80px}
   <div class="login-p">Entrez votre identifiant et votre mot de passe pour accéder à votre carte et vos bons de livraison</div>
   <div class="field">
     <label class="field-lbl">Identifiant</label>
-    <input class="field-in" id="codeIn" type="text" placeholder="MAG-XXXXXX" maxlength="12" autocomplete="off" autocorrect="off" spellcheck="false" oninput="checkFaceIdAvailable()" onkeydown="if(event.key==='Enter')document.getElementById('loginPwd').focus()">
+    <input class="field-in" id="codeIn" type="text" placeholder="Code, email ou téléphone" maxlength="60" autocomplete="off" autocorrect="off" spellcheck="false" oninput="checkFaceIdAvailable()" onkeydown="if(event.key==='Enter')document.getElementById('loginPwd').focus()">
   </div>
   <div class="field">
     <label class="field-lbl">Mot de passe (4 chiffres)</label>
@@ -411,24 +411,41 @@ async function loadMesDemandes() {
   }
 }
 
+// L'identifiant peut être le code (MAG-XXXXXX), un email ou un numéro
+// de téléphone (negoceid-53). resolve_salarie_identifiant() retrouve
+// le code interne correspondant — c'est ce code qui reste utilisé
+// partout ensuite (PIN, QR, historique...), rien d'autre ne change.
+var lastIdentifiantRaw = null;
+
+async function resolveIdentifiant(raw) {
+  if (!raw) return null;
+  try {
+    var { data, error } = await supabase.rpc('resolve_salarie_identifiant', { p_identifiant: raw });
+    if (!error && data) return data;
+  } catch(e) { console.error("resolve_salarie_identifiant error", e); }
+  return null;
+}
+
 // Vérifie si un identifiant a déjà une empreinte Face ID / Touch ID
 // enregistrée sur cet appareil (localStorage, vérif instantanée sans
 // appel serveur), et affiche le raccourci si oui.
 function checkFaceIdAvailable() {
-  var code = document.getElementById("codeIn").value.trim().toUpperCase();
-  var cred = code ? localStorage.getItem("webauthn_cred_" + code) : null;
+  var raw = document.getElementById("codeIn").value.trim();
+  var cred = raw ? localStorage.getItem("webauthn_cred_" + raw) : null;
   document.getElementById("loginFaceIdHint").classList.toggle("hidden", !cred);
 }
 
 async function quickFaceIdLogin() {
-  var code = document.getElementById("codeIn").value.trim().toUpperCase();
-  var cred = code ? localStorage.getItem("webauthn_cred_" + code) : null;
+  var raw = document.getElementById("codeIn").value.trim();
+  var cred = raw ? localStorage.getItem("webauthn_cred_" + raw) : null;
   var errEl = document.getElementById("err");
   errEl.style.display = "none";
   if (!cred) return;
+  lastIdentifiantRaw = raw;
 
   document.getElementById("loading").style.display = "block";
-  var user = await fetchSalarie(code);
+  var code = await resolveIdentifiant(raw);
+  var user = code ? await fetchSalarie(code) : null;
   document.getElementById("loading").style.display = "none";
   if (!user || user.statut === "INACTIF") {
     errEl.textContent = "❌ Identifiant ou mot de passe incorrect";
@@ -464,11 +481,11 @@ async function quickFaceIdLogin() {
 // le mot de passe personnel du salarié — plus besoin d'un second écran
 // de création séparé.
 async function login() {
-  var code = document.getElementById("codeIn").value.trim().toUpperCase();
+  var raw = document.getElementById("codeIn").value.trim();
   var pwd = document.getElementById("loginPwd").value.trim();
   var errEl = document.getElementById("err");
   errEl.style.display = "none";
-  if (!code || !pwd) return;
+  if (!raw || !pwd) return;
   if (!/^[0-9]{4}$/.test(pwd)) {
     errEl.textContent = "❌ Le mot de passe doit contenir 4 chiffres";
     errEl.style.display = "block";
@@ -479,7 +496,9 @@ async function login() {
   btn.disabled = true;
   document.getElementById("loading").style.display = "block";
 
-  var user = await fetchSalarie(code);
+  lastIdentifiantRaw = raw;
+  var code = await resolveIdentifiant(raw);
+  var user = code ? await fetchSalarie(code) : null;
   if (!user || user.statut === "INACTIF") {
     document.getElementById("loading").style.display = "none";
     btn.disabled = false;
@@ -551,6 +570,12 @@ async function enableFaceId() {
     });
     var rawId = btoa(String.fromCharCode.apply(null, new Uint8Array(cred.rawId)));
     localStorage.setItem("webauthn_cred_" + currentCode, rawId);
+    // On garde aussi une entrée sous l'identifiant exact tapé (code, email
+    // ou téléphone) pour que le raccourci Face ID réapparaisse la prochaine
+    // fois, quel que soit celui des trois que la personne utilise.
+    if (lastIdentifiantRaw && lastIdentifiantRaw !== currentCode) {
+      localStorage.setItem("webauthn_cred_" + lastIdentifiantRaw, rawId);
+    }
   } catch(e) { console.error("enableFaceId error", e); }
   document.getElementById("sFaceIdOffer").classList.add("hidden");
   showCarte(pendingUser);
