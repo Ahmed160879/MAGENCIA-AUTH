@@ -118,43 +118,22 @@ textarea.dmd-in{resize:none;min-height:80px}
 <div class="screen" id="sLogin">
   <div class="brand-mark">🪪</div>
   <div class="login-h">Carte d'accès</div>
-  <div class="login-p">Entrez votre code pour accéder à votre carte et vos bons de livraison</div>
+  <div class="login-p">Entrez votre identifiant et votre mot de passe pour accéder à votre carte et vos bons de livraison</div>
   <div class="field">
-    <label class="field-lbl">Code personnel</label>
-    <input class="field-in" id="codeIn" type="text" placeholder="MAG-XXXXXX" maxlength="12" autocomplete="off" autocorrect="off" spellcheck="false" onkeydown="if(event.key==='Enter')login()">
+    <label class="field-lbl">Identifiant</label>
+    <input class="field-in" id="codeIn" type="text" placeholder="MAG-XXXXXX" maxlength="12" autocomplete="off" autocorrect="off" spellcheck="false" oninput="checkFaceIdAvailable()" onkeydown="if(event.key==='Enter')document.getElementById('loginPwd').focus()">
+  </div>
+  <div class="field">
+    <label class="field-lbl">Mot de passe (4 chiffres)</label>
+    <input class="field-in" id="loginPwd" type="password" inputmode="numeric" placeholder="••••" maxlength="4" autocomplete="off" onkeydown="if(event.key==='Enter')login()">
   </div>
   <button class="btn" id="loginBtn" onclick="login()">Accéder →</button>
-  <div class="err" id="err">❌ Code non reconnu ou compte inactif</div>
+  <div class="hidden" id="loginFaceIdHint" style="width:100%;max-width:300px;text-align:center;margin-top:6px">
+    <span style="font-size:13px;color:var(--muted);cursor:pointer;text-decoration:underline" onclick="quickFaceIdLogin()">🆔 Utiliser Face ID / Touch ID à la place</span>
+  </div>
+  <div class="err" id="err">❌ Identifiant ou mot de passe incorrect</div>
   <div class="loading" id="loading">⏳ Vérification...</div>
-  <div class="hint">Codes de démo :<br><strong>MAG-384729</strong> · <strong>MAG-582341</strong> · <strong>EXT-114872</strong></div>
-</div>
-
-<!-- PIN / FACE ID -->
-<div class="screen hidden" id="sPin" style="align-items:center;justify-content:center;padding:28px 24px">
-  <div class="brand-mark">🔒</div>
-  <div class="login-h" id="pinTitle">Code PIN</div>
-  <div class="login-p" id="pinSub">Entrez votre code PIN à 4 chiffres</div>
-
-  <div id="pinScreenFields">
-    <div class="field">
-      <label class="field-lbl">Code PIN</label>
-      <input class="field-in" id="pinIn" type="password" inputmode="numeric" placeholder="••••" maxlength="4" autocomplete="off" onkeydown="if(event.key==='Enter'){document.getElementById('pinConfirmWrap').classList.contains('hidden')?submitPin():document.getElementById('pinConfirmIn').focus()}">
-    </div>
-    <div class="field hidden" id="pinConfirmWrap">
-      <label class="field-lbl">Confirmez le code PIN</label>
-      <input class="field-in" id="pinConfirmIn" type="password" inputmode="numeric" placeholder="••••" maxlength="4" autocomplete="off" onkeydown="if(event.key==='Enter')submitPin()">
-    </div>
-    <button class="btn" id="pinBtn" onclick="submitPin()">Valider →</button>
-  </div>
-
-  <div class="hidden" id="faceIdScreenFields" style="width:100%;max-width:300px">
-    <button class="btn" onclick="unlockWithFaceId()">🆔 Déverrouiller</button>
-    <div class="hint" style="cursor:pointer;text-decoration:underline;margin-top:14px" onclick="usePinInstead()">Utiliser mon code PIN</div>
-  </div>
-
-  <div class="err" id="pinErr"></div>
-  <div class="loading" id="pinLoading">⏳ Vérification...</div>
-  <div class="hint" style="cursor:pointer;text-decoration:underline" onclick="backToCode()">← Changer de code personnel</div>
+  <div class="hint">Première connexion ? Le mot de passe que vous saisissez devient votre mot de passe personnel.</div>
 </div>
 
 <!-- Proposition d'activation Face ID / Touch ID (juste après la création du PIN) -->
@@ -276,7 +255,6 @@ function esc(v) {
 
 var currentCode = null;
 var pendingUser = null;
-var pinMode = null;
 
 async function fetchSalarie(code) {
   try {
@@ -433,78 +411,35 @@ async function loadMesDemandes() {
   }
 }
 
-async function login() {
+// Vérifie si un identifiant a déjà une empreinte Face ID / Touch ID
+// enregistrée sur cet appareil (localStorage, vérif instantanée sans
+// appel serveur), et affiche le raccourci si oui.
+function checkFaceIdAvailable() {
   var code = document.getElementById("codeIn").value.trim().toUpperCase();
-  if (!code) return;
-  var btn = document.getElementById("loginBtn");
-  btn.disabled = true;
-  document.getElementById("err").style.display = "none";
+  var cred = code ? localStorage.getItem("webauthn_cred_" + code) : null;
+  document.getElementById("loginFaceIdHint").classList.toggle("hidden", !cred);
+}
+
+async function quickFaceIdLogin() {
+  var code = document.getElementById("codeIn").value.trim().toUpperCase();
+  var cred = code ? localStorage.getItem("webauthn_cred_" + code) : null;
+  var errEl = document.getElementById("err");
+  errEl.style.display = "none";
+  if (!cred) return;
+
   document.getElementById("loading").style.display = "block";
   var user = await fetchSalarie(code);
   document.getElementById("loading").style.display = "none";
-  btn.disabled = false;
-  if (!user || user.statut === "INACTIF") { document.getElementById("err").style.display = "block"; return; }
-
+  if (!user || user.statut === "INACTIF") {
+    errEl.textContent = "❌ Identifiant ou mot de passe incorrect";
+    errEl.style.display = "block";
+    return;
+  }
   currentCode = code;
   pendingUser = user;
-  await goToPinStep();
-}
 
-async function goToPinStep() {
-  var hasPin = false;
   try {
-    var { data, error } = await supabase.rpc('salarie_has_pin', { p_code: currentCode });
-    hasPin = !error && data === true;
-  } catch(e) { console.error("salarie_has_pin error", e); }
-
-  pinMode = hasPin ? "verify" : "setup";
-  document.getElementById("pinErr").style.display = "none";
-  document.getElementById("sLogin").classList.add("hidden");
-  document.getElementById("sFaceIdOffer").classList.add("hidden");
-  document.getElementById("sPin").classList.remove("hidden");
-
-  var storedCred = hasPin ? localStorage.getItem("webauthn_cred_" + currentCode) : null;
-  if (storedCred) {
-    showFaceIdStep(storedCred);
-  } else {
-    showPinFields();
-  }
-}
-
-function showPinFields() {
-  document.getElementById("pinIn").value = "";
-  document.getElementById("pinConfirmIn").value = "";
-  document.getElementById("pinErr").style.display = "none";
-  document.getElementById("pinConfirmWrap").classList.toggle("hidden", pinMode !== "setup");
-  document.getElementById("pinTitle").textContent = pinMode === "setup" ? "Créez votre code PIN" : "Code PIN";
-  document.getElementById("pinSub").textContent = pinMode === "setup"
-    ? "Ce code à 4 chiffres protège votre carte : personne d'autre ne pourra l'ouvrir sans le connaître."
-    : "Entrez votre code PIN pour accéder à votre carte";
-  document.getElementById("pinBtn").textContent = pinMode === "setup" ? "Créer →" : "Déverrouiller →";
-  document.getElementById("pinScreenFields").classList.remove("hidden");
-  document.getElementById("faceIdScreenFields").classList.add("hidden");
-  setTimeout(function(){ var f = document.getElementById("pinIn"); if (f) f.focus(); }, 50);
-}
-
-function showFaceIdStep(rawIdB64) {
-  window._pendingCredId = rawIdB64;
-  document.getElementById("pinErr").style.display = "none";
-  document.getElementById("pinTitle").textContent = "Déverrouillage rapide";
-  document.getElementById("pinSub").textContent = "Utilisez Face ID / Touch ID pour ouvrir votre carte";
-  document.getElementById("pinScreenFields").classList.add("hidden");
-  document.getElementById("faceIdScreenFields").classList.remove("hidden");
-}
-
-function usePinInstead() {
-  pinMode = "verify";
-  showPinFields();
-}
-
-async function unlockWithFaceId() {
-  var errEl = document.getElementById("pinErr");
-  errEl.style.display = "none";
-  try {
-    var rawId = Uint8Array.from(atob(window._pendingCredId), function(c){ return c.charCodeAt(0); });
+    var rawId = Uint8Array.from(atob(cred), function(c){ return c.charCodeAt(0); });
     var challenge = new Uint8Array(32);
     crypto.getRandomValues(challenge);
     var assertion = await navigator.credentials.get({
@@ -517,11 +452,73 @@ async function unlockWithFaceId() {
     });
     if (assertion) showCarte(pendingUser);
   } catch(e) {
-    console.error("unlockWithFaceId error", e);
-    errEl.textContent = "Face ID indisponible — utilisez votre code PIN";
+    console.error("quickFaceIdLogin error", e);
+    errEl.textContent = "Face ID indisponible — utilisez votre identifiant et votre mot de passe";
     errEl.style.display = "block";
-    usePinInstead();
   }
+}
+
+// Connexion en un seul écran : identifiant + mot de passe (4 chiffres).
+// À la toute première connexion d'un identifiant (aucun mot de passe
+// encore enregistré côté serveur), le mot de passe saisi ici devient
+// le mot de passe personnel du salarié — plus besoin d'un second écran
+// de création séparé.
+async function login() {
+  var code = document.getElementById("codeIn").value.trim().toUpperCase();
+  var pwd = document.getElementById("loginPwd").value.trim();
+  var errEl = document.getElementById("err");
+  errEl.style.display = "none";
+  if (!code || !pwd) return;
+  if (!/^[0-9]{4}$/.test(pwd)) {
+    errEl.textContent = "❌ Le mot de passe doit contenir 4 chiffres";
+    errEl.style.display = "block";
+    return;
+  }
+
+  var btn = document.getElementById("loginBtn");
+  btn.disabled = true;
+  document.getElementById("loading").style.display = "block";
+
+  var user = await fetchSalarie(code);
+  if (!user || user.statut === "INACTIF") {
+    document.getElementById("loading").style.display = "none";
+    btn.disabled = false;
+    errEl.textContent = "❌ Identifiant ou mot de passe incorrect";
+    errEl.style.display = "block";
+    return;
+  }
+
+  currentCode = code;
+  pendingUser = user;
+
+  var hasPin = false;
+  try {
+    var { data, error } = await supabase.rpc('salarie_has_pin', { p_code: code });
+    hasPin = !error && data === true;
+  } catch(e) { console.error("salarie_has_pin error", e); }
+
+  var ok = false;
+  try {
+    if (hasPin) {
+      var { data: verifyOk, error: verifyErr } = await supabase.rpc('verify_salarie_pin', { p_code: code, p_pin: pwd });
+      ok = !verifyErr && verifyOk === true;
+    } else {
+      var { data: setOk, error: setErr } = await supabase.rpc('set_salarie_pin', { p_code: code, p_pin: pwd });
+      ok = !setErr && !!setOk;
+    }
+  } catch(e) { console.error("login pin rpc error", e); }
+
+  document.getElementById("loading").style.display = "none";
+  btn.disabled = false;
+
+  if (!ok) {
+    errEl.textContent = "❌ Identifiant ou mot de passe incorrect";
+    errEl.style.display = "block";
+    document.getElementById("loginPwd").value = "";
+    return;
+  }
+
+  await maybeOfferFaceId();
 }
 
 async function maybeOfferFaceId() {
@@ -530,7 +527,7 @@ async function maybeOfferFaceId() {
     supported = !!(window.PublicKeyCredential && navigator.credentials && await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable());
   } catch(e) { supported = false; }
   if (supported && !localStorage.getItem("webauthn_cred_" + currentCode)) {
-    document.getElementById("sPin").classList.add("hidden");
+    document.getElementById("sLogin").classList.add("hidden");
     document.getElementById("sFaceIdOffer").classList.remove("hidden");
   } else {
     showCarte(pendingUser);
@@ -562,67 +559,6 @@ async function enableFaceId() {
 function skipFaceId() {
   document.getElementById("sFaceIdOffer").classList.add("hidden");
   showCarte(pendingUser);
-}
-
-function backToCode() {
-  pendingUser = null;
-  currentCode = null;
-  document.getElementById("sPin").classList.add("hidden");
-  document.getElementById("sFaceIdOffer").classList.add("hidden");
-  document.getElementById("sLogin").classList.remove("hidden");
-}
-
-async function submitPin() {
-  var pin = document.getElementById("pinIn").value.trim();
-  var errEl = document.getElementById("pinErr");
-  errEl.style.display = "none";
-  if (!/^[0-9]{4}$/.test(pin)) { errEl.textContent = "❌ Le code PIN doit contenir 4 chiffres"; errEl.style.display = "block"; return; }
-
-  var btn = document.getElementById("pinBtn");
-  btn.disabled = true;
-  document.getElementById("pinLoading").style.display = "block";
-
-  if (pinMode === "setup") {
-    var confirmPin = document.getElementById("pinConfirmIn").value.trim();
-    if (pin !== confirmPin) {
-      document.getElementById("pinLoading").style.display = "none";
-      btn.disabled = false;
-      errEl.textContent = "❌ Les deux codes ne correspondent pas";
-      errEl.style.display = "block";
-      return;
-    }
-    try {
-      var { data, error } = await supabase.rpc('set_salarie_pin', { p_code: currentCode, p_pin: pin });
-      document.getElementById("pinLoading").style.display = "none";
-      btn.disabled = false;
-      if (error || !data) { errEl.textContent = "❌ Impossible de créer le code PIN"; errEl.style.display = "block"; return; }
-      await maybeOfferFaceId();
-    } catch(e) {
-      document.getElementById("pinLoading").style.display = "none";
-      btn.disabled = false;
-      errEl.textContent = "❌ Erreur, réessayez";
-      errEl.style.display = "block";
-    }
-  } else {
-    try {
-      var { data: ok, error } = await supabase.rpc('verify_salarie_pin', { p_code: currentCode, p_pin: pin });
-      document.getElementById("pinLoading").style.display = "none";
-      btn.disabled = false;
-      if (error || !ok) {
-        errEl.textContent = "❌ Code PIN incorrect";
-        errEl.style.display = "block";
-        document.getElementById("pinIn").value = "";
-        document.getElementById("pinIn").focus();
-        return;
-      }
-      await maybeOfferFaceId();
-    } catch(e) {
-      document.getElementById("pinLoading").style.display = "none";
-      btn.disabled = false;
-      errEl.textContent = "❌ Erreur, réessayez";
-      errEl.style.display = "block";
-    }
-  }
 }
 
 function showCarte(user) {
@@ -664,7 +600,6 @@ function showCarte(user) {
   document.getElementById("qrImg").src = "https://api.qrserver.com/v1/create-qr-code/?size=185x185&color=10203D&bgcolor=ffffff&qzone=2&data=" + encodeURIComponent(code);
 
   document.getElementById("sLogin").classList.add("hidden");
-  document.getElementById("sPin").classList.add("hidden");
   document.getElementById("tabBar").classList.remove("hidden");
   document.getElementById("sCarte").classList.remove("hidden");
   document.getElementById("sBL").classList.add("hidden");
@@ -674,10 +609,10 @@ function out() {
   currentCode = null;
   pendingUser = null;
   currentUser = null;
-  pinMode = null;
   document.getElementById("codeIn").value = "";
+  document.getElementById("loginPwd").value = "";
+  document.getElementById("loginFaceIdHint").classList.add("hidden");
   document.getElementById("sLogin").classList.remove("hidden");
-  document.getElementById("sPin").classList.add("hidden");
   document.getElementById("sFaceIdOffer").classList.add("hidden");
   document.getElementById("tabBar").classList.add("hidden");
   document.getElementById("sCarte").classList.add("hidden");
