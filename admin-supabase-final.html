@@ -1116,6 +1116,7 @@ function renderAll() {
         '<td><button class="btn-tbl" onclick="showQR(\''+s.code+'\')">📱 QR</button></td>'+
         '<td>'+
           '<button class="btn-tbl" onclick="editSalarie(\''+s.code+'\')">✏️</button>'+
+          '<button class="btn-tbl" onclick="resetSalariePin(\''+s.code+'\')" title="Réinitialiser le mot de passe">🔑</button>'+
           '<button class="btn-tbl danger" onclick="toggleStatut(\''+s.code+'\',\''+s.statut+'\')">'+
             (s.statut==="ACTIF"?"🔴 Désactiver":"🟢 Activer")+
           '</button>'+
@@ -1271,6 +1272,15 @@ async function saveSalarie() {
   } catch(e) { console.error("saveSalarie error", e); alert("❌ Erreur :\n" + e.message); return; }
   closeModal("modalSalarie");
   loadData();
+}
+
+async function resetSalariePin(code) {
+  if (!confirm("Réinitialiser le mot de passe de " + code + " ?\n\nÀ sa prochaine connexion, le salarié choisira un nouveau mot de passe.")) return;
+  try {
+    var { data, error } = await supabase.rpc('reset_salarie_pin', { p_code: code });
+    if (error || !data) { alert("❌ Échec de la réinitialisation :\n" + (error ? error.message : "")); return; }
+    alert("✅ Mot de passe réinitialisé — " + code + " en choisira un nouveau à sa prochaine connexion.");
+  } catch(e) { console.error("resetSalariePin error", e); alert("❌ Erreur :\n" + e.message); }
 }
 
 async function toggleStatut(code, currentStatut) {
