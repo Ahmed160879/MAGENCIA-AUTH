@@ -438,7 +438,7 @@ function esc(v) {
 
 // Un SIRET valide fait 14 chiffres (espaces ignorés, ex: "123 456 789 00012").
 function normalizeSiret(raw) {
-  return String(raw || "").replace(/\s+/g, "");
+  return String(raw || "").replace(/[\s.-]+/g, "");
 }
 function isValidSiret(siret) {
   return /^[0-9]{14}$/.test(siret);
@@ -470,7 +470,10 @@ async function login() {
 
   errEl.style.display = "none";
   currentUser = appUser; // { role, company_id, agence, ... }
-  await loadCompanies();
+  var companiesLoaded = await loadCompanies();
+  if (!companiesLoaded) {
+    alert("⚠️ Impossible de charger la liste des entreprises (problème réseau). Rechargez la page ou réessayez dans quelques instants.");
+  }
 
   if (currentUser.role !== "super_admin") {
     var myComp = COMPANIES.find(function(c){return c.id === currentUser.company_id;});
@@ -598,6 +601,7 @@ async function saveNegociant() {
   var pwd = document.getElementById("negPwd").value;
   if (!agence || !siret || !email || !pwd) { alert("Tous les champs sont obligatoires (y compris le SIRET)."); return; }
   if (!isValidSiret(siret)) { alert("❌ Le numéro SIRET doit contenir 14 chiffres."); return; }
+  if (pwd.length < 8) { alert("❌ Le mot de passe doit faire au moins 8 caractères."); return; }
   var btn = document.querySelector('#modalNegociant .btn-save');
   if (btn) { btn.disabled = true; btn.textContent = "Création..."; }
   try {
@@ -706,15 +710,18 @@ async function deleteCompany(id, nom) {
 async function loadCompanies() {
   try {
     var { data, error } = await supabase.from('entreprises').select('*').order('nom');
-    if (!error && Array.isArray(data) && data.length > 0) {
+    if (!error && Array.isArray(data)) {
       COMPANIES = data;
-      return;
+      return true;
     }
-  } catch(e) {}
-  // Fallback
-  COMPANIES = [
-    {id:"magencia", nom:"MAGENCIA", prefix:"MAG", email_admin:"ahmed@magencia.fr"},
-  ];
+    console.error("loadCompanies failed", error);
+  } catch(e) { console.error("loadCompanies error", e); }
+  // Pas de fallback fictif ici : afficher une fausse entreprise "MAGENCIA"
+  // en cas de panne masquait silencieusement toutes les vraies entreprises
+  // clientes pour le super admin. On préfère une liste vide + un signal
+  // d'échec explicite (voir l'appel dans login()).
+  COMPANIES = [];
+  return false;
 }
 
 async function logout() {
@@ -1245,6 +1252,19 @@ async function saveSalarie() {
   var chantiers = document.getElementById("salChantiers").value.split(",").map(function(c){return c.trim();}).filter(Boolean);
   if (!code || !nom) { alert("Code et nom obligatoires"); return; }
   if (!currentCompany) { alert("Aucune entreprise sélectionnée"); return; }
+  var isEditForPrefixCheck = document.getElementById("salEditId").value;
+  if (!isEditForPrefixCheck) {
+    var expectedPrefix = currentCompany.prefix;
+    var matchesPrefix = code.indexOf(expectedPrefix + "-") === 0
+      || (expectedPrefix === "MAG" && code.indexOf("EXT-") === 0);
+    if (!matchesPrefix) {
+      var proceed = confirm(
+        "⚠️ Ce code (\"" + code + "\") ne commence pas par le préfixe de " + currentCompany.nom + " (\"" + expectedPrefix + "-\").\n\n" +
+        "Ce n'est pas bloquant, mais le code affiché au négociant lors du scan pourrait porter à confusion. Continuer quand même ?"
+      );
+      if (!proceed) return;
+    }
+  }
   var data = {code:code, nom:nom, poste:poste, email:email, telephone:telephone, type:type, statut:statut, chantiers:chantiers, photo:salPhotoData, company_id: currentCompany.id};
   try {
     var isEdit = document.getElementById("salEditId").value;
@@ -1288,8 +1308,8 @@ async function toggleStatut(code, currentStatut) {
   if (!confirm((newStatut==="INACTIF"?"Désactiver":"Réactiver")+" "+code+" ?")) return;
   try {
     var { error } = await supabase.from('salaries').update({statut:newStatut}).eq('code', code);
-    if (error) console.error("toggleStatut failed", error);
-  } catch(e) { console.error("toggleStatut error", e); }
+    if (error) { console.error("toggleStatut failed", error); alert("❌ Échec de l'opération :\n" + error.message); return; }
+  } catch(e) { console.error("toggleStatut error", e); alert("❌ Erreur :\n" + e.message); return; }
   loadData();
 }
 
@@ -1297,8 +1317,8 @@ async function deleteSalarie(code) {
   if (!confirm("⚠️ Supprimer définitivement " + code + " ?\n\nCette action est irréversible.")) return;
   try {
     var { error } = await supabase.from('salaries').delete().eq('code', code);
-    if (error) console.error("deleteSalarie failed", error);
-  } catch(e) { console.error("deleteSalarie error", e); }
+    if (error) { console.error("deleteSalarie failed", error); alert("❌ Échec de la suppression :\n" + error.message); return; }
+  } catch(e) { console.error("deleteSalarie error", e); alert("❌ Erreur :\n" + e.message); return; }
   loadData();
 }
 
@@ -1319,7 +1339,10 @@ function showQRInModal(code) {
 function exportCSV(type) {
   var data = type === "salaries" ? salaries : getFilteredPassages();
   if (!data.length) { alert("Aucune donnée à exporter"); return; }
-  var keys = Object.keys(data[0]);
+  // "photo" contient une image encodée en base64 (souvent plusieurs dizaines
+  // de Ko par salarié) : inutile et illisible dans un export tableur/compta,
+  // et ça alourdit énormément le fichier. On l'exclut de l'export CSV.
+  var keys = Object.keys(data[0]).filter(function(k){ return k !== "photo"; });
   var rows = [keys];
   data.forEach(function(d){ rows.push(keys.map(function(k){return Array.isArray(d[k])?d[k].join("|"):d[k]||"";})); });
   var csv = rows.map(function(r){return r.join(";");}).join("\n");
