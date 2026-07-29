@@ -105,6 +105,8 @@ textarea.dmd-in{resize:none;min-height:80px}
 .dmd-item-statut.traitee{background:var(--green-bg,#EDFBF3);color:var(--green)}
 .dmd-item-msg{font-size:12px;color:#374151}
 .dmd-item-meta{font-size:11px;color:var(--muted)}
+.dmd-item-reponse{font-size:12px;color:var(--navy);background:var(--green-bg,#EDFBF3);border-radius:10px;padding:9px 12px;margin-top:2px;line-height:1.4}
+.dmd-item-reponse strong{display:block;font-size:9px;text-transform:uppercase;letter-spacing:0.6px;color:var(--green);margin-bottom:3px;font-weight:800}
 </style>
 </head>
 <body>
@@ -121,7 +123,7 @@ textarea.dmd-in{resize:none;min-height:80px}
   <div class="login-p">Entrez votre identifiant et votre mot de passe pour accéder à votre carte et vos bons de livraison</div>
   <div class="field">
     <label class="field-lbl">Identifiant</label>
-    <input class="field-in" id="codeIn" type="text" placeholder="Code, email ou téléphone" maxlength="60" autocomplete="off" autocorrect="off" spellcheck="false" oninput="checkFaceIdAvailable()" onkeydown="if(event.key==='Enter')document.getElementById('loginPwd').focus()">
+    <input class="field-in" id="codeIn" type="text" placeholder="Code, email ou téléphone" maxlength="60" autocomplete="off" autocorrect="off" spellcheck="false" oninput="checkFaceIdAvailable()" onblur="checkFaceIdAvailableAsync()" onkeydown="if(event.key==='Enter')document.getElementById('loginPwd').focus()">
   </div>
   <div class="field">
     <label class="field-lbl">Mot de passe (4 chiffres)</label>
@@ -407,6 +409,9 @@ async function loadMesDemandes() {
     }
     list.innerHTML = demandes.map(function(d) {
       var date = d.created_at ? new Date(d.created_at).toLocaleString("fr-FR") : "—";
+      var reponseBlock = (d.statut === "traitee" && d.reponse)
+        ? '<div class="dmd-item-reponse"><strong>Réponse du négociant</strong>'+esc(d.reponse)+'</div>'
+        : '';
       return '<div class="dmd-item">'+
         '<div class="dmd-item-top">'+
           '<div class="dmd-item-agence">🏪 '+esc(d.agence_cible)+'</div>'+
@@ -414,6 +419,7 @@ async function loadMesDemandes() {
         '</div>'+
         '<div class="dmd-item-msg">'+esc(d.message)+'</div>'+
         '<div class="dmd-item-meta">'+date+(d.chantier?' · 🏗️ '+esc(d.chantier):'')+'</div>'+
+        reponseBlock+
       '</div>';
     }).join("");
   } catch(e) {
@@ -456,16 +462,37 @@ function checkFaceIdAvailable() {
   document.getElementById("loginFaceIdHint").classList.toggle("hidden", !cred);
 }
 
+// Si la vérification instantanée ci-dessus ne trouve rien, on retente une
+// fois — mais seulement en résolvant l'identifiant vers le code interne
+// d'abord. Ça couvre le cas où Face ID a été activé en tapant le code, mais
+// où la personne retape ensuite son email/téléphone (ou l'inverse) : les
+// deux désignent le même salarié, mais localStorage ne les relie pas tout
+// seul. Déclenché sur "blur" (pas à chaque frappe) pour ne pas multiplier
+// les appels serveur pendant la saisie.
+async function checkFaceIdAvailableAsync() {
+  var raw = document.getElementById("codeIn").value.trim();
+  var hint = document.getElementById("loginFaceIdHint");
+  if (!raw || !hint.classList.contains("hidden")) return;
+  var code = await resolveIdentifiant(raw);
+  if (code && localStorage.getItem("webauthn_cred_" + code) && document.getElementById("codeIn").value.trim() === raw) {
+    hint.classList.remove("hidden");
+  }
+}
+
 async function quickFaceIdLogin() {
   var raw = document.getElementById("codeIn").value.trim();
-  var cred = raw ? localStorage.getItem("webauthn_cred_" + raw) : null;
   var errEl = document.getElementById("err");
   errEl.style.display = "none";
-  if (!cred) return;
+  if (!raw) return;
   lastIdentifiantRaw = raw;
 
   document.getElementById("loading").style.display = "block";
   var code = await resolveIdentifiant(raw);
+  // La clé Face ID peut être enregistrée sous l'identifiant brut tapé, ou
+  // sous le code interne résolu (cas où Face ID a été activé via un autre
+  // des trois identifiants équivalents — voir checkFaceIdAvailableAsync).
+  var cred = localStorage.getItem("webauthn_cred_" + raw) || (code && localStorage.getItem("webauthn_cred_" + code));
+  if (!cred) { document.getElementById("loading").style.display = "none"; return; }
   var user = code ? await fetchSalarie(code) : null;
   document.getElementById("loading").style.display = "none";
   if (!user || user.statut === "INACTIF") {
@@ -575,6 +602,7 @@ async function maybeOfferFaceId() {
 }
 
 async function enableFaceId() {
+  var faceIdOk = false;
   try {
     var challenge = new Uint8Array(32);
     crypto.getRandomValues(challenge);
@@ -597,8 +625,12 @@ async function enableFaceId() {
     if (lastIdentifiantRaw && lastIdentifiantRaw !== currentCode) {
       localStorage.setItem("webauthn_cred_" + lastIdentifiantRaw, rawId);
     }
+    faceIdOk = true;
   } catch(e) { console.error("enableFaceId error", e); }
   document.getElementById("sFaceIdOffer").classList.add("hidden");
+  if (!faceIdOk) {
+    alert("⚠️ Impossible d'activer Face ID / Touch ID sur cet appareil — vous continuerez à utiliser votre mot de passe.");
+  }
   showCarte(pendingUser);
 }
 
@@ -630,7 +662,7 @@ function showCarte(user) {
   document.getElementById("blHeaderName").textContent = user.nom;
 
   // Photo gérée uniquement par l'admin de l'entreprise (non modifiable ici)
-  var photo = user.photo || localStorage.getItem("photo_" + code);
+  var photo = user.photo;
   if (photo) {
     document.getElementById("icPhotoImg").src = photo;
     document.getElementById("icPhotoImg").style.display = "block";
