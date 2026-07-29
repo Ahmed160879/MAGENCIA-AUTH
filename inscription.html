@@ -38,11 +38,6 @@ body{font-family:'Inter',sans-serif;background:var(--bg);min-height:100vh;displa
       <input class="form-in" id="fNom" type="text" placeholder="BTP Martin SAS">
     </div>
     <div class="form-group">
-      <label class="form-lbl">Préfixe des codes salariés</label>
-      <input class="form-in" id="fPrefix" type="text" placeholder="Ex : MAR" maxlength="6" style="text-transform:uppercase">
-      <div class="form-hint">3 à 4 lettres, servira à identifier vos salariés (ex : MAR-001)</div>
-    </div>
-    <div class="form-group">
       <label class="form-lbl">Numéro SIRET</label>
       <input class="form-in" id="fSiret" type="text" placeholder="123 456 789 00012" maxlength="17" inputmode="numeric">
       <div class="form-hint">14 chiffres, disponible sur votre Kbis ou societe.com</div>
@@ -76,7 +71,6 @@ var SUPABASE_KEY = "sb_publishable_Hb6ILSc7bzW_sC6ZD2X7Nw_QP5homkU";
 
 async function submitForm() {
   var nom = document.getElementById("fNom").value.trim();
-  var prefix = document.getElementById("fPrefix").value.trim().toUpperCase();
   var siret = document.getElementById("fSiret").value.replace(/\s+/g, "");
   var email = document.getElementById("fEmail").value.trim().toLowerCase();
   var pwd1 = document.getElementById("fPwd1").value;
@@ -84,7 +78,7 @@ async function submitForm() {
   var errEl = document.getElementById("errMsg");
   errEl.style.display = "none";
 
-  if (!nom || !prefix || !siret || !email || !pwd1) {
+  if (!nom || !siret || !email || !pwd1) {
     errEl.textContent = "❌ Merci de remplir tous les champs";
     errEl.style.display = "block";
     return;
@@ -117,7 +111,7 @@ async function submitForm() {
         "apikey": SUPABASE_KEY,
         "Authorization": "Bearer " + SUPABASE_KEY
       },
-      body: JSON.stringify({ nom: nom, prefix: prefix, siret: siret, email: email, password: pwd1 })
+      body: JSON.stringify({ nom: nom, siret: siret, email: email, password: pwd1 })
     });
     var data = await res.json();
     btn.disabled = false;
