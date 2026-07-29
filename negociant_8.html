@@ -396,16 +396,8 @@ var forgotAgence = null;
 var currentPassageCode = null;
 var currentPassageId = null;
 var scanning = false, stream = null, raf = null;
-var autoResetTimer = null;
 
-var DEMO = {
-  "MAG-384729":{nom:"EL MRABET Ahmed",poste:"Gérant",type:"INTERNE",statut:"ACTIF",chantiers:["NOZ Brioude","Patriarca","Carter Cash Angoulins","Stow Your Bags"]},
-  "MAG-582341":{nom:"DUPONT Vincent",poste:"Chef de chantier",type:"INTERNE",statut:"ACTIF",chantiers:["Carter Cash Angoulins","Stow Your Bags"]},
-  "MAG-800699":{nom:"BELBAKKAL Jaouad",poste:"Chef de chantier",type:"INTERNE",statut:"ACTIF",chantiers:["Tous chantiers"]},
-  "EXT-114872":{nom:"MARTIN Paul",poste:"Sous-traitant",type:"EXT",statut:"ACTIF",chantiers:["Stow Your Bags"]}
-};
-
-var companyNames = {"MAG":"MAGENCIA","EXT":"Sous-traitant","ATL":"ATLAS","MAR":"BTP Martin SAS"};
+var companyNames = {"MAG":"MAGENCIA","EXT":"Sous-traitant"};
 
 window.onload = function() {
   // Si le lien contient déjà ?nego=..., on affiche le nom de l'agence et on
@@ -466,12 +458,25 @@ async function loginNego() {
   document.getElementById("sLogin").classList.add("hidden");
 
   // Si le compte vient d'être créé avec un mot de passe provisoire,
-  // on bloque l'accès au scanner tant qu'il n'est pas remplacé.
+  // on bloque l'accès au scanner tant qu'il n'est pas remplacé. Si l'appel
+  // échoue (réseau/serveur), on NE SUPPOSE PAS que tout va bien : mieux
+  // vaut refuser l'accès et laisser réessayer que de laisser passer un
+  // compte qui devait encore changer son mot de passe provisoire.
   var mustChange = false;
+  var appUserChecked = false;
   try {
-    var { data: appUser } = await supabase.rpc('current_app_user');
+    var { data: appUser, error: appUserErr } = await supabase.rpc('current_app_user');
+    if (appUserErr) throw appUserErr;
+    appUserChecked = true;
     mustChange = !!(appUser && appUser.must_change_password);
   } catch(e) { console.error("current_app_user error", e); }
+
+  if (!appUserChecked) {
+    document.getElementById("sLogin").classList.remove("hidden");
+    err.textContent = "❌ Connexion au serveur impossible — réessayez";
+    err.style.display = "block";
+    return;
+  }
 
   if (mustChange) {
     document.getElementById("sForcePwdNego").classList.remove("hidden");
@@ -610,35 +615,37 @@ async function showResult(code) {
       currentPassageId = row.passage_id;
       ok = row.resultat === "AUTORISE";
       motif = row.motif || null;
-      if (row.code) {
+      // row.code est toujours renvoyé (y compris pour un code inconnu ou un
+      // compte verrouillé), mais row.nom ne l'est que si un vrai salarié a
+      // été trouvé en base — c'est le seul signal fiable pour construire une
+      // fiche identité. Ne jamais afficher un badge/nom à partir d'un simple
+      // écho du code scanné (ça avait déjà induit en erreur sur les comptes
+      // verrouillés : badge "Sous-traitant" affiché sans vérification réelle).
+      if (row.nom) {
         user = { code: row.code, nom: row.nom, poste: row.poste, type: row.type, statut: row.statut, chantiers: row.chantiers, photo: row.photo, entreprise: row.entreprise };
       }
     }
   } catch(e) { console.error("log_passage error", e); }
 
-  if (!serverOk) {
-    // Le serveur n'a pas pu être contacté : on retombe sur les codes de démo
-    // (pour ne pas bloquer une démo hors-ligne), mais aucun passage réel n'est
-    // enregistré dans ce cas.
-    var demo = DEMO[code];
-    if (demo) {
-      user = Object.assign({code: code}, demo);
-      ok = user.statut === "ACTIF" && user.chantiers && user.chantiers.length > 0;
-    }
-  }
-
   var prefix = code.split("-")[0];
   var companyName = user && user.entreprise ? user.entreprise : (companyNames[prefix] || prefix);
 
+  // Si le serveur n'a pas pu être contacté, on ne doit surtout pas afficher
+  // un verdict positif basé sur des données locales : impossible de garantir
+  // qu'un contrôle réel a eu lieu. On affiche un état "vérification
+  // impossible" neutre, sans identité, et aucun passage n'est enregistré.
+  if (!serverOk) { ok = false; motif = "verification_impossible"; }
+
   document.getElementById("verdict").className = "verdict " + (ok ? "ok" : "ko");
-  document.getElementById("vIcon").textContent = ok ? "✅" : "🚫";
-  document.getElementById("vText").textContent = ok ? "AUTORISÉ" : "REFUSÉ";
+  document.getElementById("vIcon").textContent = !serverOk ? "⚠️" : (ok ? "✅" : "🚫");
+  document.getElementById("vText").textContent = !serverOk ? "VÉRIFICATION IMPOSSIBLE" : (ok ? "AUTORISÉ" : "REFUSÉ");
   var motifLabels = {
     code_inconnu: "Code non reconnu",
     entreprise_desactivee: "Entreprise désactivée",
     salarie_inactif: "Compte inactif",
     aucun_chantier: "Aucun chantier autorisé",
-    trop_de_tentatives: "Trop de codes inconnus scannés — réessayez dans 15 min"
+    trop_de_tentatives: "Trop de codes inconnus scannés — réessayez dans 15 min",
+    verification_impossible: "Connexion au serveur impossible — ne pas valider ce retrait, réessayez"
   };
   document.getElementById("vSub").textContent = ok
     ? "Salarié autorisé à passer commande"
@@ -651,7 +658,7 @@ async function showResult(code) {
 
   // Photo (vient de la base — visible sur n'importe quel appareil négociant)
   try {
-    var savedPhoto = (user && user.photo) || localStorage.getItem("photo_" + code);
+    var savedPhoto = user && user.photo;
     if (savedPhoto) { document.getElementById("dPhotoImg").src = savedPhoto; document.getElementById("dPhotoImg").style.display = "block"; document.getElementById("dPhotoEmoji").style.display = "none"; }
     else { document.getElementById("dPhotoImg").style.display = "none"; document.getElementById("dPhotoEmoji").style.display = "block"; }
   } catch(e) {}
@@ -680,10 +687,11 @@ async function showResult(code) {
   document.getElementById("resultSection").style.flexDirection = "column";
 }
 
-// Annule le retour auto si l'utilisateur est en train de saisir un BL/chantier
-function cancelAutoReset() {
-  if (autoResetTimer) { clearTimeout(autoResetTimer); autoResetTimer = null; }
-}
+// Reliquat d'un ancien "retour auto au scanner" retiré — aucun minuteur
+// n'est plus programmé nulle part, cette fonction ne fait donc plus rien.
+// Conservée en no-op pour ne pas casser les attributs onfocus/onchange
+// qui l'appellent encore dans le HTML.
+function cancelAutoReset() {}
 
 // Détecte les valeurs signifiant "aucune restriction de chantier" saisies côté admin :
 // "Tous", "Tous chantiers", "Tous les chantiers", "Toutes", etc. (tout ce qui commence
@@ -746,6 +754,7 @@ async function saveBL() {
   // impossible d'enregistrer un chantier qui ne fait pas partie de la vraie liste
   // autorisée du salarié, quel que soit ce que le navigateur envoie.
   var saved = false;
+  var callFailed = false;
   try {
     var { data, error } = await supabase.rpc('validate_passage_chantier', {
       p_passage_id: currentPassageId,
@@ -754,10 +763,16 @@ async function saveBL() {
     });
     if (error) throw error;
     saved = data === true;
-  } catch(e) { console.error("saveBL error", e); }
+  } catch(e) { console.error("saveBL error", e); callFailed = true; }
 
   if (!saved) {
-    errEl.textContent = "❌ Sélectionnez un chantier autorisé avant de valider le retrait";
+    // On distingue "chantier refusé par le serveur" (le cas normal, message
+    // habituel) de "le serveur n'a pas pu être contacté" (message trompeur
+    // sinon : rien n'indique alors que c'est un problème réseau, pas une
+    // erreur de saisie).
+    errEl.textContent = callFailed
+      ? "❌ Connexion au serveur impossible — réessayez"
+      : "❌ Sélectionnez un chantier autorisé avant de valider le retrait";
     errEl.style.display = "block";
     return;
   }
