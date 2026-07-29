@@ -197,7 +197,7 @@ tr:hover td{background:#FAFBFF}
   <div class="dash-tabs" id="dashTabs" style="display:none">
     <button class="dash-tab active" id="dashTabSalaries" onclick="switchDashView('salaries',this)">👤 Salariés & passages</button>
     <button class="dash-tab" id="dashTabCompanies" onclick="switchDashView('companies',this)">🏢 Gestion des entreprises<span class="tab-badge" id="dashTabCompaniesBadge" style="display:none"></span></button>
-    <button class="dash-tab" id="dashTabNegociants" onclick="switchDashView('negociants',this)">🏪 Négociants</button>
+    <button class="dash-tab" id="dashTabNegociants" onclick="switchDashView('negociants',this)">🏪 Négociants<span class="tab-badge" id="dashTabNegociantsBadge" style="display:none"></span></button>
   </div>
 
   <!-- VUE : SALARIÉS & PASSAGES -->
@@ -503,6 +503,7 @@ async function login() {
   if (currentUser.role === "super_admin") {
     if (COMPANIES.length > 0) selectCompany(COMPANIES[0]);
     subscribeToEntreprises();
+    subscribeToNegociants();
     requestNotificationPermission();
   } else {
     // À ce stade, myComp (ci-dessus) a déjà garanti que l'entreprise existe
@@ -521,7 +522,7 @@ function switchDashView(view, el) {
   document.getElementById("viewDashCompanies").style.display = view === "companies" ? "block" : "none";
   document.getElementById("viewDashNegociants").style.display = view === "negociants" ? "block" : "none";
   if (view === "companies") renderCompaniesSection();
-  if (view === "negociants") loadNegociants();
+  if (view === "negociants") { loadNegociants(); clearNegociantLoginBadge(); }
 }
 
 // ── NÉGOCIANTS (super admin) ──
@@ -717,6 +718,8 @@ async function logout() {
   if (pwdEl) pwdEl.value = "";
   unsubscribeRealtime();
   unsubscribeEntreprises();
+  unsubscribeNegociants();
+  negociantLoginUnseen = 0;
   document.title = "NégoceID — Admin";
   await supabase.auth.signOut();
 }
@@ -904,7 +907,71 @@ function updatePendingBadge() {
     badge.textContent = count;
     badge.style.display = count > 0 ? "inline-flex" : "none";
   }
-  document.title = count > 0 ? "(" + count + ") NégoceID — Admin" : "NégoceID — Admin";
+  refreshDashTitle();
+}
+
+// ── TEMPS RÉEL — PREMIÈRE CONNEXION NÉGOCIANT ──
+// negociant_login_events est alimentée une seule fois par agence, par
+// clear_must_change_password() elle-même, exactement au moment où le
+// négociant valide son mot de passe définitif (voir negoceid-52). On
+// s'abonne uniquement aux INSERT : chaque ligne = une vraie première
+// connexion, jamais un doublon.
+var negociantsChannel = null;
+var negociantLoginUnseen = 0;
+
+function subscribeToNegociants() {
+  if (negociantsChannel) {
+    supabase.removeChannel(negociantsChannel);
+    negociantsChannel = null;
+  }
+  negociantsChannel = supabase.channel('negociant-logins-realtime-' + Date.now())
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'negociant_login_events' }, function(payload) {
+      var agence = payload && payload.new ? payload.new.agence : null;
+      negociantLoginUnseen++;
+      updateNegociantLoginBadge();
+      notifyNegociantFirstLogin(agence);
+    })
+    .subscribe();
+}
+
+function unsubscribeNegociants() {
+  if (negociantsChannel) {
+    supabase.removeChannel(negociantsChannel);
+    negociantsChannel = null;
+  }
+}
+
+function notifyNegociantFirstLogin(agence) {
+  if (window.Notification && Notification.permission === "granted") {
+    try {
+      new Notification("🏪 Première connexion négociant", {
+        body: (agence || "Une agence négociant") + " vient de se connecter pour la première fois."
+      });
+    } catch (e) { console.error("Notification error", e); }
+  }
+}
+
+function updateNegociantLoginBadge() {
+  var badge = document.getElementById("dashTabNegociantsBadge");
+  if (badge) {
+    badge.textContent = negociantLoginUnseen;
+    badge.style.display = negociantLoginUnseen > 0 ? "inline-flex" : "none";
+  }
+  refreshDashTitle();
+}
+
+function clearNegociantLoginBadge() {
+  negociantLoginUnseen = 0;
+  updateNegociantLoginBadge();
+}
+
+// Combine les deux compteurs (demandes d'adhésion + premières connexions
+// négociant) dans le titre d'onglet, pour qu'aucun des deux ne masque
+// l'autre.
+function refreshDashTitle() {
+  var pending = COMPANIES.filter(function(c){ return (c.statut || "actif") === "en_attente"; }).length;
+  var total = pending + negociantLoginUnseen;
+  document.title = total > 0 ? "(" + total + ") NégoceID — Admin" : "NégoceID — Admin";
 }
 
 function openAddCompany() {
