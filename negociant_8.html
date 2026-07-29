@@ -173,6 +173,10 @@ body{font-family:'Inter',sans-serif;background:var(--bg);display:flex;flex-direc
   <div class="brand-mark">🏪</div>
   <div class="login-h">Espace Négociant</div>
   <div class="login-p" id="loginSubtitle">Connectez-vous pour scanner les QR codes des salariés</div>
+  <div class="field hidden" id="loginAgenceWrap">
+    <label class="field-lbl">Nom de l'agence</label>
+    <input class="field-in" id="loginAgence" type="text" placeholder="Nom de votre agence" autocomplete="off" onkeydown="if(event.key==='Enter')document.getElementById('loginPwd').focus()">
+  </div>
   <div class="field">
     <label class="field-lbl">Code d'accès agence</label>
     <input class="field-in" id="loginPwd" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')loginNego()">
@@ -388,6 +392,7 @@ var currentNego = null;
 // Lire le nom de l'agence depuis l'URL
 var urlParams = new URLSearchParams(window.location.search);
 var negoFromUrl = urlParams.get("nego") ? decodeURIComponent(urlParams.get("nego")) : null;
+var forgotAgence = null;
 var currentPassageCode = null;
 var currentPassageId = null;
 var scanning = false, stream = null, raf = null;
@@ -403,13 +408,25 @@ var DEMO = {
 var companyNames = {"MAG":"MAGENCIA","EXT":"Sous-traitant","ATL":"ATLAS","MAR":"BTP Martin SAS"};
 
 window.onload = function() {
-  // Afficher le nom de l'agence lue dans l'URL
+  // Si le lien contient déjà ?nego=..., on affiche le nom de l'agence et on
+  // masque le champ de saisie. Sinon (lien générique negociant_8.html), on
+  // laisse l'agence taper elle-même le nom de son agence.
   if (negoFromUrl) {
     document.getElementById("loginSubtitle").textContent = "Agence : " + negoFromUrl;
     document.getElementById("loginSubtitle").style.fontWeight = "700";
     document.getElementById("loginSubtitle").style.color = "#10203D";
+  } else {
+    document.getElementById("loginAgenceWrap").classList.remove("hidden");
   }
 };
+
+// Renvoie le nom d'agence à utiliser pour la connexion : celui de l'URL
+// (?nego=...) s'il est présent, sinon celui tapé dans le champ dédié.
+function getLoginAgence() {
+  if (negoFromUrl) return negoFromUrl;
+  var el = document.getElementById("loginAgence");
+  return el ? el.value.trim() : "";
+}
 
 // Clock
 setInterval(function(){
@@ -419,10 +436,10 @@ setInterval(function(){
 }, 1000);
 
 async function loginNego() {
-  var nego = negoFromUrl;
+  var nego = getLoginAgence();
   var pwd = document.getElementById("loginPwd").value;
   var err = document.getElementById("loginErr");
-  if (!nego) { err.textContent = "❌ Agence manquante dans le lien (paramètre ?nego=...)"; err.style.display = "block"; return; }
+  if (!nego) { err.textContent = "❌ Merci de renseigner le nom de votre agence"; err.style.display = "block"; return; }
 
   var btn = document.querySelector(".btn-login");
   if (btn) { btn.disabled = true; btn.textContent = "Connexion..."; }
@@ -878,7 +895,9 @@ function goToChangePasswordNego() {
 // mot de passe) : on le retrouve côté serveur via get_negociant_email,
 // à partir du nom d'agence déjà connu dans l'URL (?nego=...).
 function showForgotNego() {
-  if (!negoFromUrl) { alert("❌ Agence manquante dans le lien (paramètre ?nego=...)"); return; }
+  var nego = getLoginAgence();
+  if (!nego) { alert("❌ Merci de renseigner le nom de votre agence avant de demander la réinitialisation"); return; }
+  forgotAgence = nego;
   document.getElementById("sLogin").classList.add("hidden");
   document.getElementById("sForgotNego").classList.remove("hidden");
   document.getElementById("forgotNegoErr").style.display = "none";
@@ -897,7 +916,7 @@ async function sendResetNego() {
   okEl.style.display = "none";
   var email = null;
   try {
-    var { data, error } = await supabase.rpc('get_negociant_email', { p_agence: negoFromUrl });
+    var { data, error } = await supabase.rpc('get_negociant_email', { p_agence: forgotAgence });
     if (!error && data) email = data;
   } catch(e) { console.error("get_negociant_email error", e); }
   if (!email) {
