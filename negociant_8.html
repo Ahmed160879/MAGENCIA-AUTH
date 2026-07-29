@@ -594,7 +594,7 @@ async function showResult(code) {
       ok = row.resultat === "AUTORISE";
       motif = row.motif || null;
       if (row.code) {
-        user = { code: row.code, nom: row.nom, poste: row.poste, type: row.type, statut: row.statut, chantiers: row.chantiers };
+        user = { code: row.code, nom: row.nom, poste: row.poste, type: row.type, statut: row.statut, chantiers: row.chantiers, photo: row.photo, entreprise: row.entreprise };
       }
     }
   } catch(e) { console.error("log_passage error", e); }
