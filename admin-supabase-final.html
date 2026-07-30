@@ -436,6 +436,23 @@ function esc(v) {
     .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
 }
 
+// Échappement pour une donnée insérée comme argument de chaîne JS DANS un
+// attribut onclick="fn('...')" (ex: onclick="editSalarie('"+escJsAttr(s.code)+"')").
+// esc() seul NE SUFFIT PAS ici : le navigateur décode les entités HTML de
+// l'attribut AVANT d'exécuter le JS, ce qui annule la protection contre une
+// apostrophe et permet de sortir de la chaîne JS (ex: code = "x');fetch('...)").
+// On échappe donc d'abord pour le contexte JS (backslash, apostrophe, retours
+// à la ligne), PUIS pour le contexte HTML de l'attribut (& " <).
+function escJsAttr(v) {
+  return String(v == null ? "" : v)
+    .replace(/\\/g, "\\\\")
+    .replace(/'/g, "\\'")
+    .replace(/\n/g, "\\n").replace(/\r/g, "")
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;");
+}
+
 // Un SIRET valide fait 14 chiffres (espaces ignorés, ex: "123 456 789 00012").
 function normalizeSiret(raw) {
   return String(raw || "").replace(/[\s.-]+/g, "");
@@ -556,8 +573,8 @@ async function loadNegociants() {
         '<td>'+esc(n.email||"—")+'</td>'+
         '<td><code style="font-size:10px;word-break:break-all">'+esc(link)+'</code></td>'+
         '<td>'+
-          '<button class="btn-tbl" onclick="copyNegociantLink(\''+link.replace(/'/g,"\\'")+'\')">📋 Copier</button>'+
-          '<button class="btn-tbl danger" onclick="deleteNegociant(\''+n.auth_user_id+'\',\''+esc(n.agence).replace(/'/g,"\\'")+'\')" title="Supprimer définitivement">🗑️</button>'+
+          '<button class="btn-tbl" onclick="copyNegociantLink(\''+escJsAttr(link)+'\')">📋 Copier</button>'+
+          '<button class="btn-tbl danger" onclick="deleteNegociant(\''+escJsAttr(n.auth_user_id)+'\',\''+escJsAttr(n.agence)+'\')" title="Supprimer définitivement">🗑️</button>'+
         '</td>'+
       '</tr>';
     }).join("");
@@ -649,14 +666,14 @@ function renderCompaniesSection() {
     var statutLabel = statut === "actif" ? "ACTIF" : (statut === "en_attente" ? "EN ATTENTE" : "DÉSACTIVÉ");
     var actionBtn;
     if (statut === "en_attente") {
-      actionBtn = '<button class="btn-action btn-gold" onclick="activateCompany(\''+c.id+'\')">✅ Activer</button>';
+      actionBtn = '<button class="btn-action btn-gold" onclick="activateCompany(\''+escJsAttr(c.id)+'\')">✅ Activer</button>';
     } else if (statut === "actif") {
-      actionBtn = '<button class="btn-tbl danger" onclick="setCompanyStatut(\''+c.id+'\',\'inactif\')">⛔ Désactiver</button>';
+      actionBtn = '<button class="btn-tbl danger" onclick="setCompanyStatut(\''+escJsAttr(c.id)+'\',\'inactif\')">⛔ Désactiver</button>';
     } else {
-      actionBtn = '<button class="btn-tbl" onclick="setCompanyStatut(\''+c.id+'\',\'actif\')">🟢 Réactiver</button>';
+      actionBtn = '<button class="btn-tbl" onclick="setCompanyStatut(\''+escJsAttr(c.id)+'\',\'actif\')">🟢 Réactiver</button>';
     }
     var isMagencia = c.id === "magencia";
-    var deleteBtn = isMagencia ? "" : '<button class="btn-tbl danger" onclick="deleteCompany(\''+c.id+'\',\''+esc(c.nom).replace(/'/g,"\\'")+'\')" title="Supprimer définitivement">🗑️</button>';
+    var deleteBtn = isMagencia ? "" : '<button class="btn-tbl danger" onclick="deleteCompany(\''+escJsAttr(c.id)+'\',\''+escJsAttr(c.nom)+'\')" title="Supprimer définitivement">🗑️</button>';
     return '<tr>'+
       '<td>'+esc(c.nom)+'</td>'+
       '<td>'+esc(c.email_admin||"—")+'</td>'+
@@ -1108,10 +1125,16 @@ function renderAll() {
     sb.innerHTML = salaries.map(function(s) {
       var ch = Array.isArray(s.chantiers) ? s.chantiers : [];
       var photoCell = s.photo
-        ? '<img class="tbl-photo" src="'+s.photo+'" alt="">'
+        ? '<img class="tbl-photo" src="'+esc(s.photo)+'" alt="">'
         : '<span class="tbl-photo-placeholder">👤</span>';
       var typePillClass = s.type==="INTERNE" ? "pill-blue" : (s.type==="INTERIMAIRE" ? "pill-purple" : "pill-gold");
       var typeLabel = s.type==="INTERNE" ? "INTERNE" : (s.type==="INTERIMAIRE" ? "INTÉRIMAIRE" : "SOUS-TRAITANT");
+      // s.code est réutilisé ci-dessous comme argument JS dans plusieurs
+      // onclick="..." — escJsAttr() est indispensable (esc() seul ne
+      // protège pas ce contexte, voir sa définition plus haut) car ce
+      // champ est un texte libre saisi par un company_admin.
+      var codeAttr = escJsAttr(s.code);
+      var statutAttr = escJsAttr(s.statut);
       return '<tr>'+
         '<td>'+photoCell+'</td>'+
         '<td><code style="font-size:11px;font-weight:700;color:var(--navy)">'+esc(s.code)+'</code></td>'+
@@ -1120,14 +1143,14 @@ function renderAll() {
         '<td><span class="pill '+typePillClass+'">'+typeLabel+'</span></td>'+
         '<td><span class="pill '+(s.statut==="ACTIF"?"pill-green":"pill-red")+'">'+esc(s.statut)+'</span></td>'+
         '<td style="font-size:12px">'+esc(ch.join(", "))+'</td>'+
-        '<td><button class="btn-tbl" onclick="showQR(\''+s.code+'\')">📱 QR</button></td>'+
+        '<td><button class="btn-tbl" onclick="showQR(\''+codeAttr+'\')">📱 QR</button></td>'+
         '<td>'+
-          '<button class="btn-tbl" onclick="editSalarie(\''+s.code+'\')">✏️</button>'+
-          '<button class="btn-tbl" onclick="resetSalariePin(\''+s.code+'\')" title="Réinitialiser le mot de passe">🔑</button>'+
-          '<button class="btn-tbl danger" onclick="toggleStatut(\''+s.code+'\',\''+s.statut+'\')">'+
+          '<button class="btn-tbl" onclick="editSalarie(\''+codeAttr+'\')">✏️</button>'+
+          '<button class="btn-tbl" onclick="resetSalariePin(\''+codeAttr+'\')" title="Réinitialiser le mot de passe">🔑</button>'+
+          '<button class="btn-tbl danger" onclick="toggleStatut(\''+codeAttr+'\',\''+statutAttr+'\')">'+
             (s.statut==="ACTIF"?"🔴 Désactiver":"🟢 Activer")+
           '</button>'+
-          '<button class="btn-tbl danger" onclick="deleteSalarie(\''+s.code+'\')" title="Supprimer définitivement">🗑️</button>'+
+          '<button class="btn-tbl danger" onclick="deleteSalarie(\''+codeAttr+'\')" title="Supprimer définitivement">🗑️</button>'+
         '</td>'+
       '</tr>';
     }).join("");
@@ -1251,6 +1274,14 @@ async function saveSalarie() {
   var statut = document.getElementById("salStatut").value;
   var chantiers = document.getElementById("salChantiers").value.split(",").map(function(c){return c.trim();}).filter(Boolean);
   if (!code || !nom) { alert("Code et nom obligatoires"); return; }
+  // Le code est réutilisé tel quel dans plusieurs endroits de l'interface
+  // (boutons d'action, fenêtre QR) : on interdit les caractères qui n'ont
+  // rien à faire dans un identifiant technique, pour ne jamais avoir à
+  // gérer un code contenant apostrophe/guillemet/chevrons.
+  if (!/^[A-Z0-9_-]+$/.test(code)) {
+    alert("❌ Le code ne peut contenir que des lettres, chiffres, tirets (-) et underscores (_) — sans espace ni caractère spécial.");
+    return;
+  }
   if (!currentCompany) { alert("Aucune entreprise sélectionnée"); return; }
   var isEditForPrefixCheck = document.getElementById("salEditId").value;
   if (!isEditForPrefixCheck) {
@@ -1326,7 +1357,10 @@ function showQR(code) {
   // Le QR encode uniquement le code salarié (lu tel quel côté négociant, caméra ou lecteur USB)
   var qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=200x200&color=10203D&bgcolor=ffffff&qzone=2&data="+encodeURIComponent(code);
   var w = window.open("","_blank","width=300,height=350");
-  w.document.write('<html><body style="margin:0;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:sans-serif;background:#F5F6F8;padding:20px"><img src="'+qrUrl+'" style="width:200px;border-radius:12px"><p style="margin-top:12px;font-size:14px;font-weight:700;color:#10203D">'+code+'</p><button onclick="window.print()" style="margin-top:12px;padding:10px 20px;background:#FF6A1A;color:white;border:none;border-radius:8px;cursor:pointer;font-weight:700">🖨️ Imprimer</button></body></html>');
+  // esc() ici, pas escJsAttr() : "code" est inséré comme contenu texte HTML
+  // (pas comme argument JS dans un onclick), donc l'échappement HTML classique
+  // suffit à empêcher toute injection de balise (<script>, <img onerror=...>).
+  w.document.write('<html><body style="margin:0;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:sans-serif;background:#F5F6F8;padding:20px"><img src="'+qrUrl+'" style="width:200px;border-radius:12px"><p style="margin-top:12px;font-size:14px;font-weight:700;color:#10203D">'+esc(code)+'</p><button onclick="window.print()" style="margin-top:12px;padding:10px 20px;background:#FF6A1A;color:white;border:none;border-radius:8px;cursor:pointer;font-weight:700">🖨️ Imprimer</button></body></html>');
 }
 
 function showQRInModal(code) {
