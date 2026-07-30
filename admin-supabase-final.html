@@ -267,6 +267,17 @@ tr:hover td{background:#FAFBFF}
         <tbody id="pendingBody"></tbody>
       </table>
     </div>
+
+    <div class="section" id="toolsSection" style="margin-top:20px">
+      <div class="section-hdr">
+        <div class="section-title">🛠️ Outils</div>
+      </div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:10px">
+        Migration ponctuelle des photos salariés encore stockées en base64 dans la base de données vers le stockage Supabase (fichiers). À lancer une fois, après avoir déployé le script SQL negoceid-57 (création du bucket "salarie-photos"). Sans risque, peut être relancée sans problème si interrompue.
+      </div>
+      <button class="btn-tbl" onclick="migrateSalariesPhotosToStorage()">🖼️ Migrer les photos vers le stockage</button>
+      <div id="photoMigrationStatus" style="font-size:12px;margin-top:10px;color:var(--muted)"></div>
+    </div>
   </div>
 
   <!-- VUE : NÉGOCIANTS (super admin) -->
@@ -1229,9 +1240,78 @@ function editSalarie(code) {
   document.getElementById("modalSalarie").classList.add("open");
 }
 
+// Envoie une image (Blob) dans le bucket Supabase Storage "salarie-photos",
+// à l'emplacement {company_id}/{code}.jpg — l'upsert écrase l'ancienne photo
+// du même salarié plutôt que d'accumuler des fichiers orphelins à chaque
+// remplacement. On ne stocke plus jamais l'image en base64 dans la colonne
+// "photo" de la table salaries : seule l'URL publique y est conservée,
+// pour ne pas alourdir la base de données à mesure que le nombre
+// d'entreprises/salariés augmente. "silent" évite les popups d'erreur en
+// boucle lors d'une migration par lot (voir migrateSalariesPhotosToStorage).
+async function uploadSalPhotoBlob(companyId, code, blob, silent) {
+  var path = companyId + "/" + code + ".jpg";
+  try {
+    var { error } = await supabase.storage.from("salarie-photos").upload(path, blob, { upsert: true, contentType: "image/jpeg" });
+    if (error) {
+      console.error("uploadSalPhotoBlob error", error);
+      if (!silent) alert("❌ Échec de l'envoi de la photo :\n" + error.message);
+      return null;
+    }
+    var { data } = supabase.storage.from("salarie-photos").getPublicUrl(path);
+    return (data && data.publicUrl) ? data.publicUrl : null;
+  } catch (e) {
+    console.error("uploadSalPhotoBlob error", e);
+    if (!silent) alert("❌ Échec de l'envoi de la photo :\n" + e.message);
+    return null;
+  }
+}
+
+// Outil de migration ponctuelle (bouton super_admin, vue "Entreprises") :
+// reprend tous les salariés dont la photo est encore stockée en base64
+// directement dans la colonne "photo" (ancien système) et les envoie une
+// par une vers le bucket Storage "salarie-photos", puis met à jour la ligne
+// avec l'URL obtenue. Peut être relancée sans risque (elle ne retraite que
+// les lignes encore en base64).
+async function migrateSalariesPhotosToStorage() {
+  if (!currentUser || currentUser.role !== "super_admin") return;
+  var statusEl = document.getElementById("photoMigrationStatus");
+  if (!confirm("Migrer toutes les photos encore stockées en base64 vers le stockage Supabase ?\n\nLes photos restent identiques, seul leur emplacement de stockage change. Sans risque, peut être relancée si interrompue.")) return;
+  statusEl.textContent = "⏳ Recherche des photos à migrer...";
+  var { data, error } = await supabase.from("salaries").select("code,company_id,photo").like("photo", "data:image%");
+  if (error) { statusEl.textContent = "❌ Erreur : " + error.message; return; }
+  var rows = Array.isArray(data) ? data : [];
+  if (rows.length === 0) { statusEl.textContent = "✅ Aucune photo à migrer — tout est déjà sur le stockage."; return; }
+  var done = 0, failed = 0;
+  for (var i = 0; i < rows.length; i++) {
+    var r = rows[i];
+    statusEl.textContent = "⏳ Migration " + (i + 1) + "/" + rows.length + " (" + r.code + ")...";
+    try {
+      var resp = await fetch(r.photo);
+      var blob = await resp.blob();
+      var url = await uploadSalPhotoBlob(r.company_id, r.code, blob, true);
+      if (!url) { failed++; continue; }
+      var { error: updErr } = await supabase.from("salaries").update({ photo: url }).eq("code", r.code);
+      if (updErr) { console.error("migrateSalariesPhotosToStorage update error", r.code, updErr); failed++; continue; }
+      done++;
+    } catch (e) {
+      console.error("migrateSalariesPhotosToStorage row error", r.code, e);
+      failed++;
+    }
+  }
+  statusEl.textContent = "✅ Migration terminée — " + done + " photo(s) migrée(s)" + (failed ? ", " + failed + " échec(s) (voir la console du navigateur)" : "") + ".";
+  loadData();
+}
+
 function loadSalPhoto(input) {
   var file = input.files[0];
   if (!file) return;
+  var code = document.getElementById("salCode").value.trim().toUpperCase();
+  if (!code) {
+    alert("❌ Renseignez d'abord le code du salarié avant d'ajouter une photo (il sert de nom de fichier).");
+    input.value = "";
+    return;
+  }
+  if (!currentCompany) { alert("❌ Aucune entreprise sélectionnée."); input.value = ""; return; }
   var reader = new FileReader();
   reader.onload = function(e) {
     var img = new Image();
@@ -1243,8 +1323,22 @@ function loadSalPhoto(input) {
       canvas.height = Math.round(img.height * scale);
       var ctx = canvas.getContext("2d");
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      salPhotoData = canvas.toDataURL("image/jpeg", 0.75);
-      showSalPhotoPreview(salPhotoData);
+      // Aperçu instantané pendant l'envoi (base64, jamais sauvegardé tel quel).
+      showSalPhotoPreview(canvas.toDataURL("image/jpeg", 0.75));
+      canvas.toBlob(async function(blob) {
+        if (!blob) { alert("❌ Impossible de traiter cette image."); return; }
+        var url = await uploadSalPhotoBlob(currentCompany.id, code, blob);
+        if (url) {
+          salPhotoData = url;
+          showSalPhotoPreview(url);
+        } else {
+          // Échec d'envoi : on ne garde jamais l'image en base64 comme
+          // secours (ce serait revenir exactement au problème qu'on
+          // cherche à éliminer) — l'admin voit l'échec et peut réessayer.
+          salPhotoData = null;
+          showSalPhotoPreview(null);
+        }
+      }, "image/jpeg", 0.75);
     };
     img.src = e.target.result;
   };
@@ -1259,9 +1353,15 @@ function showSalPhotoPreview(photo) {
 }
 
 function removeSalPhoto() {
+  var oldUrl = salPhotoData;
   salPhotoData = null;
   document.getElementById("salPhotoInput").value = "";
   showSalPhotoPreview(null);
+  // Best-effort : nettoie le fichier dans Storage (pas bloquant si ça échoue).
+  if (oldUrl && oldUrl.indexOf("/salarie-photos/") !== -1) {
+    var path = oldUrl.split("/salarie-photos/")[1];
+    if (path) supabase.storage.from("salarie-photos").remove([path]).catch(function(e){ console.error("removeSalPhoto storage cleanup error", e); });
+  }
 }
 
 async function saveSalarie() {
@@ -1373,10 +1473,12 @@ function showQRInModal(code) {
 function exportCSV(type) {
   var data = type === "salaries" ? salaries : getFilteredPassages();
   if (!data.length) { alert("Aucune donnée à exporter"); return; }
-  // "photo" contient une image encodée en base64 (souvent plusieurs dizaines
-  // de Ko par salarié) : inutile et illisible dans un export tableur/compta,
-  // et ça alourdit énormément le fichier. On l'exclut de l'export CSV.
-  var keys = Object.keys(data[0]).filter(function(k){ return k !== "photo"; });
+  // "photo" est désormais une URL Storage courte (voir uploadSalPhotoBlob) :
+  // on peut l'inclure dans l'export. On exclut uniquement les éventuelles
+  // photos pas encore migrées (encore en base64, illisibles dans un tableur)
+  // — voir migrateSalariesPhotosToStorage().
+  var hasLegacyBase64Photo = data.some(function(d){ return typeof d.photo === "string" && d.photo.indexOf("data:image") === 0; });
+  var keys = Object.keys(data[0]).filter(function(k){ return !(k === "photo" && hasLegacyBase64Photo); });
   var rows = [keys];
   data.forEach(function(d){ rows.push(keys.map(function(k){return Array.isArray(d[k])?d[k].join("|"):d[k]||"";})); });
   var csv = rows.map(function(r){return r.join(";");}).join("\n");
