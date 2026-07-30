@@ -1240,18 +1240,23 @@ function editSalarie(code) {
   document.getElementById("modalSalarie").classList.add("open");
 }
 
-// Envoie une image (Blob) dans le bucket Supabase Storage "salarie-photos",
-// à l'emplacement {company_id}/{code}.jpg — l'upsert écrase l'ancienne photo
-// du même salarié plutôt que d'accumuler des fichiers orphelins à chaque
-// remplacement. On ne stocke plus jamais l'image en base64 dans la colonne
-// "photo" de la table salaries : seule l'URL publique y est conservée,
-// pour ne pas alourdir la base de données à mesure que le nombre
-// d'entreprises/salariés augmente. "silent" évite les popups d'erreur en
-// boucle lors d'une migration par lot (voir migrateSalariesPhotosToStorage).
-async function uploadSalPhotoBlob(companyId, code, blob, silent) {
-  var path = companyId + "/" + code + ".jpg";
+// Envoie une image (Blob) dans le bucket Supabase Storage "salarie-photos".
+// Le bucket doit rester public en lecture (le salarié n'a pas de compte
+// Supabase Auth — juste code+PIN — donc lui comme l'admin/le négociant
+// doivent pouvoir afficher la photo via une simple URL, sans jeton d'accès).
+// Pour ne pas transformer "public" en "n'importe qui sur Internet peut
+// deviner l'URL et télécharger les photos des salariés" (company_id est
+// souvent devinable, code suit fréquemment un motif du type PREFIX-001,
+// PREFIX-002...), le nom de fichier est un identifiant aléatoire — jamais
+// {company_id}/{code}.jpg. La colonne "photo" en base conserve toujours
+// l'URL complète, donc l'app n'a jamais besoin de reconstruire ce chemin.
+// "silent" évite les popups d'erreur en boucle lors d'une migration par lot
+// (voir migrateSalariesPhotosToStorage).
+async function uploadSalPhotoBlob(companyId, blob, silent) {
+  var randomId = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : (Date.now() + "-" + Math.random().toString(36).slice(2));
+  var path = companyId + "/" + randomId + ".jpg";
   try {
-    var { error } = await supabase.storage.from("salarie-photos").upload(path, blob, { upsert: true, contentType: "image/jpeg" });
+    var { error } = await supabase.storage.from("salarie-photos").upload(path, blob, { contentType: "image/jpeg" });
     if (error) {
       console.error("uploadSalPhotoBlob error", error);
       if (!silent) alert("❌ Échec de l'envoi de la photo :\n" + error.message);
@@ -1263,6 +1268,17 @@ async function uploadSalPhotoBlob(companyId, code, blob, silent) {
     console.error("uploadSalPhotoBlob error", e);
     if (!silent) alert("❌ Échec de l'envoi de la photo :\n" + e.message);
     return null;
+  }
+}
+
+// Best-effort : supprime l'ancien fichier Storage d'une photo remplacée ou
+// retirée, pour ne pas accumuler de fichiers orphelins (chaque envoi utilise
+// désormais un nom aléatoire, donc l'ancien fichier n'est plus jamais
+// réécrit automatiquement — il faut le supprimer explicitement).
+function deleteStoredSalPhoto(url) {
+  if (url && url.indexOf("/salarie-photos/") !== -1) {
+    var path = url.split("/salarie-photos/")[1];
+    if (path) supabase.storage.from("salarie-photos").remove([path]).catch(function(e){ console.error("deleteStoredSalPhoto error", e); });
   }
 }
 
@@ -1288,7 +1304,7 @@ async function migrateSalariesPhotosToStorage() {
     try {
       var resp = await fetch(r.photo);
       var blob = await resp.blob();
-      var url = await uploadSalPhotoBlob(r.company_id, r.code, blob, true);
+      var url = await uploadSalPhotoBlob(r.company_id, blob, true);
       if (!url) { failed++; continue; }
       var { error: updErr } = await supabase.from("salaries").update({ photo: url }).eq("code", r.code);
       if (updErr) { console.error("migrateSalariesPhotosToStorage update error", r.code, updErr); failed++; continue; }
@@ -1305,13 +1321,8 @@ async function migrateSalariesPhotosToStorage() {
 function loadSalPhoto(input) {
   var file = input.files[0];
   if (!file) return;
-  var code = document.getElementById("salCode").value.trim().toUpperCase();
-  if (!code) {
-    alert("❌ Renseignez d'abord le code du salarié avant d'ajouter une photo (il sert de nom de fichier).");
-    input.value = "";
-    return;
-  }
   if (!currentCompany) { alert("❌ Aucune entreprise sélectionnée."); input.value = ""; return; }
+  var previousUrl = salPhotoData;
   var reader = new FileReader();
   reader.onload = function(e) {
     var img = new Image();
@@ -1327,16 +1338,17 @@ function loadSalPhoto(input) {
       showSalPhotoPreview(canvas.toDataURL("image/jpeg", 0.75));
       canvas.toBlob(async function(blob) {
         if (!blob) { alert("❌ Impossible de traiter cette image."); return; }
-        var url = await uploadSalPhotoBlob(currentCompany.id, code, blob);
+        var url = await uploadSalPhotoBlob(currentCompany.id, blob);
         if (url) {
           salPhotoData = url;
           showSalPhotoPreview(url);
+          deleteStoredSalPhoto(previousUrl); // ancienne photo remplacée : on nettoie le fichier précédent
         } else {
           // Échec d'envoi : on ne garde jamais l'image en base64 comme
           // secours (ce serait revenir exactement au problème qu'on
           // cherche à éliminer) — l'admin voit l'échec et peut réessayer.
-          salPhotoData = null;
-          showSalPhotoPreview(null);
+          salPhotoData = previousUrl;
+          showSalPhotoPreview(previousUrl);
         }
       }, "image/jpeg", 0.75);
     };
@@ -1357,11 +1369,7 @@ function removeSalPhoto() {
   salPhotoData = null;
   document.getElementById("salPhotoInput").value = "";
   showSalPhotoPreview(null);
-  // Best-effort : nettoie le fichier dans Storage (pas bloquant si ça échoue).
-  if (oldUrl && oldUrl.indexOf("/salarie-photos/") !== -1) {
-    var path = oldUrl.split("/salarie-photos/")[1];
-    if (path) supabase.storage.from("salarie-photos").remove([path]).catch(function(e){ console.error("removeSalPhoto storage cleanup error", e); });
-  }
+  deleteStoredSalPhoto(oldUrl);
 }
 
 async function saveSalarie() {
