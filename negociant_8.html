@@ -306,6 +306,13 @@ body{font-family:'Inter',sans-serif;background:var(--bg);display:flex;flex-direc
 
   <!-- SCAN -->
   <div style="padding:14px;gap:12px;display:flex;flex-direction:column" id="scanSection">
+    <!-- Champ invisible et non cliquable (position hors écran) : reçoit les
+         frappes clavier envoyées par une douchette USB (elle "tape" le
+         contenu scanné comme un clavier physique, elle ne passe pas par la
+         caméra). Comme il n'est pas cliquable ni visible, personne ne peut
+         y taper un code à la main via l'interface — seule la douchette,
+         qui exige la présence physique de la carte/du QR, peut l'alimenter. -->
+    <input id="scanCapture" type="text" tabindex="-1" autocomplete="off" autocorrect="off" spellcheck="false" style="position:absolute;opacity:0;pointer-events:none;width:1px;height:1px;top:-9999px;left:-9999px" onkeydown="if(event.key==='Enter')captureScanInput()">
     <div class="scan-card">
       <div class="cam-wrap">
         <video id="video" autoplay playsinline muted></video>
@@ -511,10 +518,25 @@ async function submitForcePassword() {
   enterAppNego();
 }
 
-// Ne fait plus rien depuis le retrait de la saisie manuelle (#mi n'existe
-// plus) : conservée en no-op pour ne pas casser les appels existants
-// (enterAppNego, switchTab, resetScan).
-function focusManualInput() {}
+// Reporte le focus sur le champ invisible #scanCapture, pour que la
+// douchette USB (qui tape ses résultats comme un clavier) continue à
+// fonctionner même sans champ de saisie visible.
+function focusManualInput() {
+  setTimeout(function(){ var f = document.getElementById("scanCapture"); if (f) f.focus(); }, 50);
+}
+
+// Appelée quand la douchette USB termine un scan (elle envoie un "Entrée"
+// après le contenu décodé). Même niveau de confiance qu'un scan caméra
+// (pas de PIN) : ça exige la présence physique de la carte/du QR du
+// salarié, contrairement à une saisie manuelle à la main.
+function captureScanInput() {
+  var el = document.getElementById("scanCapture");
+  var raw = el.value.trim();
+  el.value = "";
+  if (!raw) return;
+  var code = extractCode(raw);
+  if (code) showResult(code);
+}
 
 // Extrait le code salarié depuis le contenu brut d'un QR (ou d'une saisie/scan USB) :
 // si c'est une URL contenant un paramètre "v", on l'utilise ; sinon on prend le texte tel quel.
