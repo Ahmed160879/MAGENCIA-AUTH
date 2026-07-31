@@ -160,7 +160,10 @@ body{font-family:'Inter',sans-serif;background:var(--bg);display:flex;flex-direc
 <body>
 <div class="safe-top"></div>
 <div class="hdr">
-  <div><div class="logo">Négoce<em>ID</em></div><div class="logo-sub">Négociant</div></div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <img id="negLogoImg" src="" alt="" style="display:none;width:34px;height:34px;object-fit:contain;border-radius:7px;background:#fff;padding:3px">
+    <div><div class="logo">Négoce<em>ID</em></div><div class="logo-sub">Négociant</div></div>
+  </div>
   <div class="hdr-right">
     <div class="hdr-nego" id="hdrNego">—</div>
     <div class="hdr-clock" id="hdrClock">--:--:--</div>
@@ -496,6 +499,14 @@ async function loginNego() {
     if (appUserErr) throw appUserErr;
     appUserChecked = true;
     mustChange = !!(appUser && appUser.must_change_password);
+    // Logo propre à l'agence (posé par le super admin dans l'admin) —
+    // esc() ne suffit pas ici puisqu'on l'assigne à .src (pas de HTML
+    // généré), donc pas de risque d'injection à échapper.
+    var logoImg = document.getElementById("negLogoImg");
+    if (logoImg) {
+      if (appUser && appUser.logo_url) { logoImg.src = appUser.logo_url; logoImg.style.display = "block"; }
+      else { logoImg.style.display = "none"; }
+    }
   } catch(e) { console.error("current_app_user error", e); }
 
   if (!appUserChecked) {

@@ -290,8 +290,8 @@ tr:hover td{background:#FAFBFF}
         </div>
       </div>
       <table>
-        <thead><tr><th>Agence</th><th>Email</th><th>Lien de connexion</th><th>Action</th></tr></thead>
-        <tbody id="negociantsBody"><tr><td colspan="4" style="text-align:center;color:var(--muted);padding:24px">⏳ Chargement...</td></tr></tbody>
+        <thead><tr><th>Logo</th><th>Agence</th><th>Email</th><th>Lien de connexion</th><th>Action</th></tr></thead>
+        <tbody id="negociantsBody"><tr><td colspan="5" style="text-align:center;color:var(--muted);padding:24px">⏳ Chargement...</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -579,13 +579,22 @@ async function loadNegociants() {
     var baseUrl = window.location.origin + window.location.pathname.replace(/admin-supabase-final\.html$/, "");
     body.innerHTML = list.map(function(n) {
       var link = baseUrl + "negociant_8.html?nego=" + encodeURIComponent(n.agence);
+      var uid = escJsAttr(n.auth_user_id);
+      var logoCell = n.logo_url
+        ? '<img src="'+esc(n.logo_url)+'" style="width:40px;height:40px;object-fit:contain;border-radius:6px;border:1px solid var(--border);background:#fff" alt="">'
+        : '<div style="width:40px;height:40px;border-radius:6px;border:1px dashed var(--border);display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:16px">🏪</div>';
       return '<tr>'+
+        '<td>'+
+          logoCell+
+          '<input type="file" accept="image/*" id="negLogoFile_'+esc(n.auth_user_id)+'" style="display:none" onchange="uploadNegociantLogo(\''+uid+'\', this)">'+
+          '<button class="btn-tbl" style="margin-top:4px" onclick="document.getElementById(\'negLogoFile_'+esc(n.auth_user_id)+'\').click()">'+(n.logo_url?"✏️ Changer":"➕ Logo")+'</button>'+
+        '</td>'+
         '<td>'+esc(n.agence)+'</td>'+
         '<td>'+esc(n.email||"—")+'</td>'+
         '<td><code style="font-size:10px;word-break:break-all">'+esc(link)+'</code></td>'+
         '<td>'+
           '<button class="btn-tbl" onclick="copyNegociantLink(\''+escJsAttr(link)+'\')">📋 Copier</button>'+
-          '<button class="btn-tbl danger" onclick="deleteNegociant(\''+escJsAttr(n.auth_user_id)+'\',\''+escJsAttr(n.agence)+'\')" title="Supprimer définitivement">🗑️</button>'+
+          '<button class="btn-tbl danger" onclick="deleteNegociant(\''+uid+'\',\''+escJsAttr(n.agence)+'\')" title="Supprimer définitivement">🗑️</button>'+
         '</td>'+
       '</tr>';
     }).join("");
@@ -604,6 +613,26 @@ async function deleteNegociant(authUserId, agence) {
   } catch(e) { alert("❌ Erreur :\n" + e.message); return; }
   loadNegociants();
   alert("🗑️ Agence supprimée");
+}
+
+async function uploadNegociantLogo(authUserId, inputEl) {
+  var file = inputEl.files && inputEl.files[0];
+  inputEl.value = "";
+  if (!file) return;
+  if (!/^image\//.test(file.type)) { alert("❌ Merci de choisir une image."); return; }
+  if (file.size > 3 * 1024 * 1024) { alert("❌ Image trop lourde (max 3 Mo)."); return; }
+  var ext = (file.name.split(".").pop() || "png").toLowerCase().replace(/[^a-z0-9]/g, "") || "png";
+  var path = authUserId + "/logo." + ext;
+  try {
+    var { error: upErr } = await supabase.storage.from("negociant-logos").upload(path, file, { upsert: true, contentType: file.type });
+    if (upErr) { alert("❌ Échec de l'envoi du logo :\n" + upErr.message); return; }
+    var { data } = supabase.storage.from("negociant-logos").getPublicUrl(path);
+    var publicUrl = (data && data.publicUrl) ? (data.publicUrl + "?t=" + Date.now()) : null;
+    if (!publicUrl) { alert("❌ Logo envoyé mais URL introuvable."); return; }
+    var { data: ok, error: rpcErr } = await supabase.rpc("set_negociant_logo", { p_auth_user_id: authUserId, p_logo_url: publicUrl });
+    if (rpcErr || !ok) { alert("❌ Échec de l'enregistrement du logo :\n" + (rpcErr ? rpcErr.message : "rôle invalide")); return; }
+  } catch(e) { alert("❌ Erreur :\n" + e.message); return; }
+  loadNegociants();
 }
 
 function copyNegociantLink(link) {
