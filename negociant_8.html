@@ -247,6 +247,12 @@ body{font-family:'Inter',sans-serif;background:var(--bg);display:flex;flex-direc
 
 <!-- SCANNER -->
 <div class="screen hidden" id="sScan">
+  <!-- Capture invisible : reste focus pendant l'affichage du résultat pour
+       qu'un nouveau scan (douchette/QR) puisse basculer directement sur un
+       autre salarié sans repasser par "Scanner un autre salarié". Le champ
+       #mi visible étant masqué (display:none) pendant resultSection, il ne
+       peut plus recevoir le focus — ce champ prend le relais à ce moment-là. -->
+  <input id="scanCapture" type="text" autocomplete="off" autocorrect="off" spellcheck="false" tabindex="-1" style="position:absolute;opacity:0;pointer-events:none;width:1px;height:1px;top:-9999px;left:-9999px" onkeydown="if(event.key==='Enter')verifyScanCapture()">
   <!-- RÉSULTAT -->
   <div style="padding:14px;gap:12px;flex-direction:column;display:none" id="resultSection">
     <div class="verdict" id="verdict">
@@ -515,7 +521,28 @@ async function submitForcePassword() {
 }
 
 function focusManualInput() {
-  setTimeout(function(){ var f = document.getElementById("mi"); if (f) f.focus(); }, 50);
+  // Si l'écran résultat est affiché, #mi est masqué (donc non focusable) :
+  // c'est alors le champ de capture invisible #scanCapture qui doit avoir le
+  // focus, pour qu'un nouveau scan bascule directement sur le salarié suivant.
+  setTimeout(function(){
+    var resultShown = document.getElementById("resultSection").style.display !== "none";
+    var f = document.getElementById(resultShown ? "scanCapture" : "mi");
+    if (f) f.focus();
+  }, 50);
+}
+
+// Appelée quand un scan est capté pendant que l'écran résultat est affiché
+// (voir #scanCapture) : bascule directement sur le nouveau salarié scanné,
+// sans repasser par le bouton "Scanner un autre salarié". Aucune conséquence
+// sur la sécurité : showResult() revalide tout côté serveur (log_passage)
+// exactement comme pour un scan classique, quel que soit le déclencheur.
+function verifyScanCapture() {
+  var el = document.getElementById("scanCapture");
+  var raw = el.value.trim();
+  el.value = "";
+  if (!raw) return;
+  var code = extractCode(raw);
+  if (code) showResult(code);
 }
 
 // Extrait le code salarié depuis le contenu brut d'un QR (ou d'une saisie/scan USB) :
@@ -685,6 +712,9 @@ async function showResult(code) {
   document.getElementById("scanSection").style.display = "none";
   document.getElementById("resultSection").style.display = "flex";
   document.getElementById("resultSection").style.flexDirection = "column";
+  // Reprend le focus sur le champ de capture invisible (#scanCapture) pour
+  // qu'un scan suivant bascule directement sur un autre salarié.
+  focusManualInput();
 }
 
 // Reliquat d'un ancien "retour auto au scanner" retiré — aucun minuteur
