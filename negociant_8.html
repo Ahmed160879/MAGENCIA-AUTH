@@ -414,6 +414,17 @@ window.onload = function() {
   } else {
     document.getElementById("loginAgenceWrap").classList.remove("hidden");
   }
+
+  // Sur PC/Mac, la caméra ne sert à rien (c'est la douchette USB qui
+  // scanne) : on masque le bloc caméra pour ne pas prêter à confusion.
+  // Sur mobile/tablette (pas de douchette possible), on la garde comme
+  // seul moyen de scanner. Détection approximative par User-Agent — pas
+  // parfaite, mais suffisante ici : ça ne conditionne aucune vérification
+  // de sécurité, juste l'affichage d'un bouton.
+  if (!/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent || "")) {
+    var camCard = document.querySelector(".scan-card");
+    if (camCard) camCard.style.display = "none";
+  }
 };
 
 // Renvoie le nom d'agence à utiliser pour la connexion : celui de l'URL
