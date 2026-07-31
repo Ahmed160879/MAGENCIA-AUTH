@@ -318,11 +318,8 @@ body{font-family:'Inter',sans-serif;background:var(--bg);display:flex;flex-direc
       <div class="cam-st" id="camSt">Pointez vers le QR du salarié</div>
     </div>
     <div class="manual-card">
-      <div class="box-lbl">📝 Ou saisir le code manuellement</div>
-      <div class="row">
-        <input class="mi" id="mi" type="text" placeholder="MAG-XXXXXX" maxlength="12" autocomplete="off" autocorrect="off" spellcheck="false" onkeydown="if(event.key==='Enter')verifyManual()">
-        <button class="bv" onclick="verifyManual()">OK</button>
-      </div>
+      <div class="box-lbl">🔒 Vérification par scan QR uniquement</div>
+      <div style="font-size:12px;color:var(--muted)">La saisie manuelle du code a été retirée : seul un scan du QR du salarié (carte ou "Ma carte" sur son téléphone) peut autoriser un retrait, pour empêcher toute autorisation à partir d'un code mémorisé sans que le salarié soit physiquement présent.</div>
     </div>
   </div>
 </div>
@@ -514,9 +511,10 @@ async function submitForcePassword() {
   enterAppNego();
 }
 
-function focusManualInput() {
-  setTimeout(function(){ var f = document.getElementById("mi"); if (f) f.focus(); }, 50);
-}
+// Ne fait plus rien depuis le retrait de la saisie manuelle (#mi n'existe
+// plus) : conservée en no-op pour ne pas casser les appels existants
+// (enterAppNego, switchTab, resetScan).
+function focusManualInput() {}
 
 // Extrait le code salarié depuis le contenu brut d'un QR (ou d'une saisie/scan USB) :
 // si c'est une URL contenant un paramètre "v", on l'utilise ; sinon on prend le texte tel quel.
@@ -602,12 +600,17 @@ async function repondreDemandeNego(id) {
 // Le verdict AUTORISE/REFUSE et l'enregistrement du passage sont désormais
 // entièrement calculés côté serveur (fonction log_passage) : impossible pour
 // le navigateur d'imposer un résultat, quel que soit ce qu'il envoie.
-async function showResult(code) {
+async function showResult(code, pin) {
   currentPassageCode = code;
   currentPassageId = null;
   var user = null, ok = false, serverOk = false, motif = null;
   try {
-    var { data, error } = await supabase.rpc('log_passage', { p_code: code, p_agence: currentNego });
+    // p_pin n'est envoyé que pour une saisie manuelle (voir verifyManual) :
+    // un scan QR/caméra n'en a jamais besoin, sa présence physique (la
+    // carte/l'écran du salarié) fait déjà office de vérification.
+    var rpcArgs = { p_code: code, p_agence: currentNego };
+    if (pin) rpcArgs.p_pin = pin;
+    var { data, error } = await supabase.rpc('log_passage', rpcArgs);
     if (error) throw error;
     var row = Array.isArray(data) ? data[0] : data;
     if (row) {
@@ -645,7 +648,8 @@ async function showResult(code) {
     salarie_inactif: "Compte inactif",
     aucun_chantier: "Aucun chantier autorisé",
     trop_de_tentatives: "Trop de codes inconnus scannés — réessayez dans 15 min",
-    verification_impossible: "Connexion au serveur impossible — ne pas valider ce retrait, réessayez"
+    verification_impossible: "Connexion au serveur impossible — ne pas valider ce retrait, réessayez",
+    pin_incorrect: "Code PIN incorrect (ou pas encore configuré par ce salarié) — utilisez plutôt le scan QR"
   };
   document.getElementById("vSub").textContent = ok
     ? "Salarié autorisé à passer commande"
@@ -783,12 +787,9 @@ async function saveBL() {
   document.getElementById("savedCard").style.display = "flex";
 }
 
-function verifyManual() {
-  var raw = document.getElementById("mi").value.trim();
-  if (!raw) return;
-  var code = extractCode(raw);
-  if (code) showResult(code);
-}
+// La saisie manuelle du code (verifyManual) a été retirée : seul le scan
+// QR (scanLoop, plus bas) peut désormais déclencher showResult() et donc
+// autoriser un retrait — voir manual-card dans le HTML pour le contexte.
 
 async function loadHistorique() {
   document.getElementById("histoList").innerHTML = '<div style="text-align:center;padding:24px;color:var(--muted)">⏳ Chargement...</div>';
@@ -841,7 +842,7 @@ async function startCam() {
     scanning = true;
     st.textContent = "🔍 Pointez vers le QR du salarié";
     scanLoop();
-  } catch(e) { st.textContent = "❌ Caméra indisponible — saisie manuelle"; }
+  } catch(e) { st.textContent = "❌ Caméra indisponible — vérifiez l'autorisation d'accès et réessayez"; }
 }
 
 function scanLoop() {
@@ -871,7 +872,6 @@ function resetScan() {
   cancelAutoReset();
   stopCam();
   currentPassageCode = null;
-  document.getElementById("mi").value = "";
   document.getElementById("camSt").textContent = "Pointez vers le QR du salarié";
   document.getElementById("resultSection").style.display = "none";
   document.getElementById("scanSection").style.display = "flex";
