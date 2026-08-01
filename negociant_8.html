@@ -424,6 +424,7 @@ function esc(v) {
 
 var currentNego = null;
 var demandesChannel = null;
+var demandesPollInterval = null;
 // Lire le nom de l'agence depuis l'URL
 var urlParams = new URLSearchParams(window.location.search);
 var negoFromUrl = urlParams.get("nego") ? decodeURIComponent(urlParams.get("nego")) : null;
@@ -562,6 +563,12 @@ function enterAppNego() {
   loadTodayStats();
   refreshDemandesBadge();
   subscribeDemandesRealtime();
+  // Filet de sécurité : même si le Realtime Supabase n'est pas activé côté
+  // dashboard (Database → Replication) ou ne se déclenche pas pour une
+  // raison réseau, on revérifie régulièrement pour que le badge ne reste
+  // jamais complètement à jour uniquement "si on va cliquer sur l'onglet".
+  if (demandesPollInterval) clearInterval(demandesPollInterval);
+  demandesPollInterval = setInterval(refreshDemandesBadge, 20000);
 }
 
 // Nombre de demandes en attente ("nouvelle") affiché en pastille sur
@@ -1058,6 +1065,7 @@ function resetScan() {
 async function logout() {
   stopCam();
   if (demandesChannel) { supabase.removeChannel(demandesChannel); demandesChannel = null; }
+  if (demandesPollInterval) { clearInterval(demandesPollInterval); demandesPollInterval = null; }
   currentNego = null;
   document.getElementById("loginPwd").value = "";
   document.getElementById("tabBar").classList.add("hidden");
