@@ -594,6 +594,7 @@ async function loadNegociants() {
         '<td><code style="font-size:10px;word-break:break-all">'+esc(link)+'</code></td>'+
         '<td>'+
           '<button class="btn-tbl" onclick="copyNegociantLink(\''+escJsAttr(link)+'\')">📋 Copier</button>'+
+          (n.email ? '<button class="btn-tbl" onclick="resetNegociantPassword(\''+escJsAttr(n.email)+'\',\''+escJsAttr(n.agence)+'\')" title="Envoyer un lien de réinitialisation du mot de passe">🔑 Réinitialiser</button>' : '')+
           '<button class="btn-tbl danger" onclick="deleteNegociant(\''+uid+'\',\''+escJsAttr(n.agence)+'\')" title="Supprimer définitivement">🗑️</button>'+
         '</td>'+
       '</tr>';
@@ -613,6 +614,25 @@ async function deleteNegociant(authUserId, agence) {
   } catch(e) { alert("❌ Erreur :\n" + e.message); return; }
   loadNegociants();
   alert("🗑️ Agence supprimée");
+}
+
+// Permet au super admin de déclencher lui-même l'envoi du lien de
+// réinitialisation à un négociant (même flux que "mot de passe oublié"
+// que le négociant peut lancer lui-même depuis son écran de connexion) —
+// utile quand l'agence n'arrive pas à le faire elle-même. On ne définit
+// jamais de mot de passe à sa place : seul un lien envoyé à SON adresse
+// email enregistrée permet réellement le changement.
+async function resetNegociantPassword(email, agence) {
+  if (!confirm("Envoyer un lien de réinitialisation du mot de passe à " + agence + " (" + email + ") ?")) return;
+  try {
+    var baseUrl = window.location.origin + window.location.pathname.replace(/admin-supabase-final\.html$/, "");
+    var { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: baseUrl + "negociant_8.html" });
+    if (error) throw error;
+    alert("✅ Email de réinitialisation envoyé à " + email);
+  } catch(e) {
+    console.error("resetNegociantPassword error", e);
+    alert("❌ Échec de l'envoi :\n" + e.message);
+  }
 }
 
 async function uploadNegociantLogo(authUserId, inputEl) {
