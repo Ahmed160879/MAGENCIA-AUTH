@@ -355,9 +355,22 @@ body{font-family:'Inter',sans-serif;background:var(--bg);display:flex;flex-direc
       </div>
     </div>
   </div>
-  <div class="manual-card" style="text-align:center;padding:60px 20px;align-self:stretch;width:100%;box-sizing:border-box;min-height:380px;display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1">
+  <div class="manual-card" style="text-align:center;padding:40px 20px 26px;align-self:stretch;width:100%;box-sizing:border-box;min-height:380px;display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1">
     <img id="negLogoBig" src="" alt="" style="display:none;max-width:420px;max-height:280px;width:100%;object-fit:contain;margin:0 auto">
-    <div id="bigLogoPlaceholder" style="color:var(--muted);font-size:14px;line-height:1.8">🏪 Aucun logo configuré pour cette agence<br><span style="font-size:12px">Ajoutez-en un depuis l'espace admin — onglet "Négociants"</span></div>
+    <div id="bigLogoPlaceholder" style="color:var(--muted);font-size:14px;line-height:1.8">🏪 Aucun logo configuré pour cette agence<br><span style="font-size:12px">Ajoutez-en un ci-dessous, ou écrivez un texte libre</span></div>
+    <div id="negLogoTexteView" class="hidden" style="margin-top:14px;color:#10203D;font-size:15px;font-weight:600;line-height:1.5;max-width:420px;white-space:pre-wrap"></div>
+
+    <button type="button" class="btn-refresh" style="margin-top:20px" onclick="toggleLogoEditor()">✏️ Gérer mon logo</button>
+
+    <div id="negLogoEditor" class="hidden" style="margin-top:16px;width:100%;max-width:340px;text-align:left">
+      <div class="d-lbl" style="margin-bottom:6px">Logo de l'agence (image)</div>
+      <input type="file" id="negLogoFile" accept="image/*" style="width:100%;font-size:13px;color:var(--muted)">
+      <div class="d-lbl" style="margin:14px 0 6px">Texte libre (optionnel)</div>
+      <textarea id="negLogoTexteInput" class="dmn-reply-in" maxlength="200" placeholder="Ex : Horaires d'ouverture, message d'accueil..."></textarea>
+      <button type="button" class="btn-cam" style="width:100%;margin-top:12px" onclick="saveNegoLogo()" id="negLogoSaveBtn">✓ Enregistrer</button>
+      <div class="err" id="negLogoErr" style="margin-top:8px;max-width:none"></div>
+      <div class="err" id="negLogoOk" style="margin-top:8px;max-width:none;background:#EDFBF3;color:#0CAF60">✅ Enregistré</div>
+    </div>
   </div>
 </div>
 
@@ -423,6 +436,8 @@ function esc(v) {
 }
 
 var currentNego = null;
+var currentNegoAuthUserId = null;
+var currentNegoLogoUrl = null;
 var demandesChannel = null;
 var demandesPollInterval = null;
 var lastDemandesEnAttente = null; // null = pas encore chargé une 1re fois (pour ne pas notifier "à froid" à la connexion)
@@ -517,22 +532,10 @@ async function loginNego() {
     if (appUserErr) throw appUserErr;
     appUserChecked = true;
     mustChange = !!(appUser && appUser.must_change_password);
-    // Logo propre à l'agence (posé par le super admin dans l'admin) —
-    // esc() ne suffit pas ici puisqu'on l'assigne à .src (pas de HTML
-    // généré), donc pas de risque d'injection à échapper.
-    var logoImg = document.getElementById("negLogoImg");
-    var logoBig = document.getElementById("negLogoBig");
-    var logoPlaceholder = document.getElementById("bigLogoPlaceholder");
-    var hasLogo = !!(appUser && appUser.logo_url);
-    if (logoImg) {
-      if (hasLogo) { logoImg.src = appUser.logo_url; logoImg.style.display = "block"; }
-      else { logoImg.style.display = "none"; }
-    }
-    if (logoBig) {
-      if (hasLogo) { logoBig.src = appUser.logo_url; logoBig.style.display = "block"; }
-      else { logoBig.style.display = "none"; }
-    }
-    if (logoPlaceholder) logoPlaceholder.style.display = hasLogo ? "none" : "block";
+    // Identifiant du compte, nécessaire pour que le négociant puisse
+    // envoyer son logo dans SON propre dossier du bucket Storage.
+    currentNegoAuthUserId = appUser ? appUser.auth_user_id : null;
+    applyNegoBranding(appUser && appUser.logo_url, appUser && appUser.logo_texte);
   } catch(e) { console.error("current_app_user error", e); }
 
   if (!appUserChecked) {
@@ -572,6 +575,102 @@ function enterAppNego() {
   // jamais complètement à jour uniquement "si on va cliquer sur l'onglet".
   if (demandesPollInterval) clearInterval(demandesPollInterval);
   demandesPollInterval = setInterval(refreshDemandesBadge, 20000);
+}
+
+// Applique le logo + le texte libre de l'agence sur les deux emplacements
+// où ils s'affichent (petit logo du header, grand logo/texte de l'écran
+// de scan). esc() n'est pas nécessaire pour le logo (assigné à .src, pas
+// de HTML généré) mais l'est pour le texte libre (affiché en HTML).
+function applyNegoBranding(logoUrl, texte) {
+  var logoImg = document.getElementById("negLogoImg");
+  var logoBig = document.getElementById("negLogoBig");
+  var logoPlaceholder = document.getElementById("bigLogoPlaceholder");
+  var texteView = document.getElementById("negLogoTexteView");
+  var hasLogo = !!logoUrl;
+  var hasTexte = !!(texte && String(texte).trim());
+  currentNegoLogoUrl = hasLogo ? logoUrl : null;
+
+  if (logoImg) { if (hasLogo) { logoImg.src = logoUrl; logoImg.style.display = "block"; } else { logoImg.style.display = "none"; } }
+  if (logoBig) { if (hasLogo) { logoBig.src = logoUrl; logoBig.style.display = "block"; } else { logoBig.style.display = "none"; } }
+  if (logoPlaceholder) logoPlaceholder.style.display = (hasLogo || hasTexte) ? "none" : "block";
+  if (texteView) {
+    if (hasTexte) { texteView.textContent = String(texte).trim(); texteView.classList.remove("hidden"); }
+    else { texteView.textContent = ""; texteView.classList.add("hidden"); }
+  }
+}
+
+// Affiche/masque le petit formulaire "Gérer mon logo" (logo + texte libre)
+// depuis l'espace négociant lui-même — plus besoin de passer par l'admin.
+function toggleLogoEditor() {
+  var ed = document.getElementById("negLogoEditor");
+  if (!ed) return;
+  var opening = ed.classList.contains("hidden");
+  ed.classList.toggle("hidden");
+  if (opening) {
+    var texteView = document.getElementById("negLogoTexteView");
+    var ta = document.getElementById("negLogoTexteInput");
+    if (ta) ta.value = texteView ? texteView.textContent : "";
+    var errEl = document.getElementById("negLogoErr");
+    var okEl = document.getElementById("negLogoOk");
+    if (errEl) errEl.style.display = "none";
+    if (okEl) okEl.style.display = "none";
+  }
+}
+
+// Envoie le nouveau logo (si un fichier a été choisi) et/ou le texte libre.
+// Le logo est stocké dans le dossier propre à l'agence (son auth_user_id)
+// du bucket negociant-logos ; côté serveur, set_my_negociant_logo /
+// set_my_negociant_texte vérifient que l'appelant est bien un négociant et
+// ne touchent QUE sa propre ligne (jamais celle d'une autre agence).
+async function saveNegoLogo() {
+  var fileEl = document.getElementById("negLogoFile");
+  var ta = document.getElementById("negLogoTexteInput");
+  var errEl = document.getElementById("negLogoErr");
+  var okEl = document.getElementById("negLogoOk");
+  var btn = document.getElementById("negLogoSaveBtn");
+  var file = fileEl && fileEl.files ? fileEl.files[0] : null;
+  var texte = ta ? ta.value.trim() : "";
+  errEl.style.display = "none";
+  okEl.style.display = "none";
+
+  if (!currentNegoAuthUserId) {
+    errEl.textContent = "❌ Session invalide, reconnectez-vous";
+    errEl.style.display = "block";
+    return;
+  }
+  if (file) {
+    if (!/^image\//.test(file.type)) { errEl.textContent = "❌ Merci de choisir une image"; errEl.style.display = "block"; return; }
+    if (file.size > 3 * 1024 * 1024) { errEl.textContent = "❌ Image trop lourde (max 3 Mo)"; errEl.style.display = "block"; return; }
+  }
+
+  if (btn) { btn.disabled = true; btn.textContent = "Enregistrement..."; }
+  try {
+    var newLogoUrl = null;
+    if (file) {
+      var ext = (file.name.split(".").pop() || "png").toLowerCase().replace(/[^a-z0-9]/g, "") || "png";
+      var path = currentNegoAuthUserId + "/logo." + ext;
+      var { error: upErr } = await supabase.storage.from("negociant-logos").upload(path, file, { upsert: true, contentType: file.type });
+      if (upErr) throw new Error("Échec de l'envoi de l'image : " + upErr.message);
+      var { data: pub } = supabase.storage.from("negociant-logos").getPublicUrl(path);
+      if (!pub || !pub.publicUrl) throw new Error("Image envoyée mais URL introuvable");
+      newLogoUrl = pub.publicUrl + "?t=" + Date.now();
+      var { data: okLogo, error: logoRpcErr } = await supabase.rpc('set_my_negociant_logo', { p_logo_url: newLogoUrl });
+      if (logoRpcErr || !okLogo) throw new Error(logoRpcErr ? logoRpcErr.message : "Échec de l'enregistrement du logo");
+    }
+
+    var { data: okTexte, error: texteRpcErr } = await supabase.rpc('set_my_negociant_texte', { p_texte: texte || null });
+    if (texteRpcErr || !okTexte) throw new Error(texteRpcErr ? texteRpcErr.message : "Échec de l'enregistrement du texte");
+
+    applyNegoBranding(newLogoUrl || currentNegoLogoUrl, texte);
+    if (fileEl) fileEl.value = "";
+    okEl.style.display = "block";
+  } catch(e) {
+    console.error("saveNegoLogo error", e);
+    errEl.textContent = "❌ " + (e && e.message ? e.message : "Échec de l'enregistrement");
+    errEl.style.display = "block";
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = "✓ Enregistrer"; }
+  }
 }
 
 // Demande la permission d'afficher des notifications navigateur pour les
@@ -1103,6 +1202,8 @@ async function logout() {
   if (demandesPollInterval) { clearInterval(demandesPollInterval); demandesPollInterval = null; }
   lastDemandesEnAttente = null;
   currentNego = null;
+  currentNegoAuthUserId = null;
+  currentNegoLogoUrl = null;
   document.getElementById("loginPwd").value = "";
   document.getElementById("tabBar").classList.add("hidden");
   document.getElementById("hdrPwdLink").classList.add("hidden");
