@@ -29,7 +29,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);display:flex;flex-direc
 
 /* LOGIN */
 #sLogin{align-items:center;justify-content:center;padding:28px 24px}
-.brand-mark{width:72px;height:72px;background:linear-gradient(135deg,#1a4a2e,#0d3320);border-radius:22px;display:flex;align-items:center;justify-content:center;font-size:32px;margin-bottom:20px;box-shadow:0 8px 28px rgba(15,31,61,0.22)}
+.brand-mark{width:72px;height:72px;background:linear-gradient(135deg,#182A4C,#10203D);border-radius:22px;display:flex;align-items:center;justify-content:center;font-size:32px;margin-bottom:20px;box-shadow:0 8px 28px rgba(15,31,61,0.22)}
 .login-h{font-size:24px;font-weight:800;color:var(--navy);text-align:center;letter-spacing:-0.5px;margin-bottom:6px}
 .login-p{font-size:14px;color:var(--muted);text-align:center;line-height:1.55;margin-bottom:28px;max-width:260px}
 .field{width:100%;max-width:300px;margin-bottom:10px}
@@ -176,7 +176,12 @@ body{font-family:'Inter',sans-serif;background:var(--bg);display:flex;flex-direc
 
 <!-- LOGIN -->
 <div class="screen" id="sLogin">
-  <div class="brand-mark">🏪</div>
+  <div class="brand-mark">
+    <svg viewBox="0 0 180 180" width="38" height="38">
+      <path d="M90 26 L138 42 V84 C138 116 118 140 90 154 C62 140 42 116 42 84 V42 Z" fill="#FF6A1A"/>
+      <path d="M68 88 L84 104 L114 68" fill="none" stroke="#FFFFFF" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </div>
   <div class="login-h">Espace Négociant</div>
   <div class="login-p" id="loginSubtitle">Connectez-vous pour scanner les QR codes des salariés</div>
   <div class="field hidden" id="loginAgenceWrap">
