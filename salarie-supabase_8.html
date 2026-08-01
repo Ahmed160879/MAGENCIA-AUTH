@@ -231,9 +231,11 @@ textarea.dmd-in{resize:none;min-height:80px}
       <option value="">Chargement...</option>
     </select>
     <label class="dmd-lbl">Chantier concerné</label>
-    <select class="dmd-in" id="dmdChantier">
-      <option value="">—</option>
-    </select>
+    <div id="dmdChantierWrap">
+      <select class="dmd-in" id="dmdChantier">
+        <option value="">—</option>
+      </select>
+    </div>
     <label class="dmd-lbl">Votre demande</label>
     <textarea class="dmd-in" id="dmdMessage" placeholder="Ex: 10 sacs de ciment, palette de parpaings"></textarea>
     <button class="btn" style="margin-top:14px" onclick="sendDemande()">Envoyer la demande →</button>
@@ -333,17 +335,39 @@ async function openDemandeTab() {
   await loadMesDemandes();
 }
 
+// Détecte les valeurs signifiant "aucune restriction de chantier" saisies
+// côté admin : "Tous", "Tous chantiers", "Tous les chantiers", "Toutes",
+// etc. (tout ce qui commence par "tous"/"toutes") — même logique que
+// negociant_8.html, pour rester cohérent entre les deux apps.
+function isTousChantiersValue(c) {
+  var v = String(c).trim().toLowerCase();
+  return v.indexOf("tous") === 0 || v.indexOf("toutes") === 0;
+}
+
+// Construit le champ "Chantier concerné". Deux cas :
+// - salarié autorisé sur des chantiers précis : liste déroulante limitée à
+//   ces chantiers.
+// - salarié autorisé sur "Tous chantiers" : pas de liste fixe à proposer,
+//   donc un champ de saisie libre (mais toujours obligatoire, voir sendDemande).
 function populateDemandeChantiers() {
-  var sel = document.getElementById("dmdChantier");
+  var wrap = document.getElementById("dmdChantierWrap");
+  if (!wrap) return;
   var ch = (currentUser && Array.isArray(currentUser.chantiers)) ? currentUser.chantiers : [];
-  if (ch.length === 0) {
-    sel.innerHTML = '<option value="">Aucun chantier autorisé</option>';
+  var isUnrestricted = ch.some(isTousChantiersValue);
+
+  if (isUnrestricted) {
+    wrap.innerHTML = '<input class="dmd-in" id="dmdChantier" type="text" placeholder="Nom du chantier" autocomplete="off" autocorrect="off" spellcheck="false">';
     return;
   }
-  sel.innerHTML = ch.map(function(c){
+  if (ch.length === 0) {
+    wrap.innerHTML = '<select class="dmd-in" id="dmdChantier" disabled><option value="">Aucun chantier autorisé</option></select>';
+    return;
+  }
+  var options = '<option value="">— Choisir le chantier —</option>' + ch.map(function(c){
     var esc = String(c).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;");
     return '<option value="'+esc+'">'+esc+'</option>';
   }).join("");
+  wrap.innerHTML = '<select class="dmd-in" id="dmdChantier">'+options+'</select>';
 }
 
 async function populateDemandeAgences() {
@@ -368,19 +392,21 @@ async function populateDemandeAgences() {
 
 async function sendDemande() {
   var agence = document.getElementById("dmdAgence").value;
-  var chantier = document.getElementById("dmdChantier").value;
+  var chantierEl = document.getElementById("dmdChantier");
+  var chantier = chantierEl ? chantierEl.value.trim() : "";
   var message = document.getElementById("dmdMessage").value.trim();
   var errEl = document.getElementById("dmdErr");
   var okEl = document.getElementById("dmdOk");
   errEl.style.display = "none";
   okEl.style.display = "none";
   if (!agence) { errEl.textContent = "❌ Choisissez un négociant"; errEl.style.display = "block"; return; }
+  if (!chantier) { errEl.textContent = "❌ Indiquez le chantier concerné"; errEl.style.display = "block"; return; }
   if (!message) { errEl.textContent = "❌ Décrivez votre demande"; errEl.style.display = "block"; return; }
   try {
     var { error } = await supabase.rpc('create_demande', {
       p_code_salarie: currentCode,
       p_nom_salarie: currentUser ? currentUser.nom : currentCode,
-      p_chantier: chantier || null,
+      p_chantier: chantier,
       p_agence_cible: agence,
       p_message: message
     });
