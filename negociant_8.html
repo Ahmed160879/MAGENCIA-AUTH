@@ -425,6 +425,7 @@ function esc(v) {
 var currentNego = null;
 var demandesChannel = null;
 var demandesPollInterval = null;
+var lastDemandesEnAttente = null; // null = pas encore chargé une 1re fois (pour ne pas notifier "à froid" à la connexion)
 // Lire le nom de l'agence depuis l'URL
 var urlParams = new URLSearchParams(window.location.search);
 var negoFromUrl = urlParams.get("nego") ? decodeURIComponent(urlParams.get("nego")) : null;
@@ -561,6 +562,8 @@ function enterAppNego() {
   // (qui se comporte comme un clavier) de scanner directement sans clic préalable.
   focusManualInput();
   loadTodayStats();
+  requestDemandesNotifPermission();
+  lastDemandesEnAttente = null;
   refreshDemandesBadge();
   subscribeDemandesRealtime();
   // Filet de sécurité : même si le Realtime Supabase n'est pas activé côté
@@ -571,9 +574,34 @@ function enterAppNego() {
   demandesPollInterval = setInterval(refreshDemandesBadge, 20000);
 }
 
+// Demande la permission d'afficher des notifications navigateur pour les
+// nouvelles demandes — même logique que l'admin (première connexion
+// négociant / demandes d'inscription).
+function requestDemandesNotifPermission() {
+  if (window.Notification && Notification.permission === "default") {
+    try { Notification.requestPermission(); } catch(e) {}
+  }
+}
+
+// Notification navigateur affichée à la RÉCEPTION d'une nouvelle demande
+// (pas seulement quand on ouvre l'onglet) — ne se déclenche que si le
+// nombre de demandes en attente vient d'augmenter, jamais au chargement.
+function notifyNouvelleDemande(d) {
+  if (!(window.Notification && Notification.permission === "granted")) return;
+  try {
+    var nom = (d && (d.nom_salarie || d.code_salarie)) || "un salarié";
+    new Notification("📥 Nouvelle demande", {
+      body: nom + (d && d.message ? " — " + d.message : ""),
+      tag: "negoceid-demande"
+    });
+  } catch(e) { console.error("Notification error", e); }
+}
+
 // Nombre de demandes en attente ("nouvelle") affiché en pastille sur
-// l'onglet "Demandes", pour voir en un coup d'œil s'il y a du nouveau
-// sans avoir à cliquer dessus.
+// l'onglet "Demandes" ET notification navigateur dès qu'il augmente —
+// appelée aussi bien par l'écoute Realtime que par le filet de sécurité
+// (poll toutes les 20s), donc la détection "ça vient d'augmenter" couvre
+// les deux mécanismes en un seul endroit.
 async function refreshDemandesBadge() {
   var badge = document.getElementById("demBadge");
   if (!badge) return;
@@ -581,7 +609,14 @@ async function refreshDemandesBadge() {
     var { data, error } = await supabase.rpc('get_demandes_for_my_agence');
     if (error) throw error;
     var demandes = Array.isArray(data) ? data : [];
-    var enAttente = demandes.filter(function(d){ return d.statut !== "traitee"; }).length;
+    var pending = demandes.filter(function(d){ return d.statut !== "traitee"; });
+    var enAttente = pending.length;
+
+    if (lastDemandesEnAttente !== null && enAttente > lastDemandesEnAttente) {
+      notifyNouvelleDemande(pending[0]);
+    }
+    lastDemandesEnAttente = enAttente;
+
     if (enAttente > 0) {
       badge.textContent = enAttente > 99 ? "99+" : String(enAttente);
       badge.style.display = "inline-block";
@@ -1066,6 +1101,7 @@ async function logout() {
   stopCam();
   if (demandesChannel) { supabase.removeChannel(demandesChannel); demandesChannel = null; }
   if (demandesPollInterval) { clearInterval(demandesPollInterval); demandesPollInterval = null; }
+  lastDemandesEnAttente = null;
   currentNego = null;
   document.getElementById("loginPwd").value = "";
   document.getElementById("tabBar").classList.add("hidden");
