@@ -302,6 +302,15 @@ body{font-family:'Inter',sans-serif;background:var(--bg);display:flex;flex-direc
         </div>
         <div class="err" id="blErr" style="display:none;margin-top:8px;max-width:none">❌ Le n° de bon de livraison est obligatoire</div>
       </div>
+      <div style="margin-top:14px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <div style="font-size:10px;font-weight:700;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:0.8px">🔗 Lien du bon de livraison</div>
+          <div class="bl-optional">Optionnel</div>
+        </div>
+        <div class="bl-row">
+          <input class="bl-input" id="lienBlInput" type="url" placeholder="Lien vers le document (si déjà disponible)" autocomplete="off" autocorrect="off" spellcheck="false" onfocus="cancelAutoReset()">
+        </div>
+      </div>
       <button class="bl-btn" style="width:100%;margin-top:14px;padding:14px" onclick="saveBL()">✓ Valider le retrait pour ce chantier</button>
       <div class="bl-saved" id="blSaved">
         <div style="font-size:16px">✅</div>
@@ -452,6 +461,21 @@ function esc(v) {
   return String(v == null ? "" : v)
     .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
     .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+}
+
+// Pour injecter une valeur dynamique à l'intérieur d'un attribut onclick="...('...')" :
+// le navigateur décode l'attribut HTML AVANT d'exécuter le JS, ce qui annule
+// la protection d'esc() contre une apostrophe et permettrait de sortir de la
+// chaîne JS. On échappe donc d'abord pour le contexte JS (backslash,
+// apostrophe, retours à la ligne), PUIS pour le contexte HTML de l'attribut.
+function escJsAttr(v) {
+  return String(v == null ? "" : v)
+    .replace(/\\/g, "\\\\")
+    .replace(/'/g, "\\'")
+    .replace(/\n/g, "\\n").replace(/\r/g, "")
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;");
 }
 
 var currentNego = null;
@@ -1009,6 +1033,8 @@ async function showResult(code, pin) {
 
   document.getElementById("blCard").style.display = ok ? "block" : "none";
   document.getElementById("blInput").value = "";
+  var lienBlEl0 = document.getElementById("lienBlInput");
+  if (lienBlEl0) lienBlEl0.value = "";
   window._currentAuthorizedChantiers = (user && Array.isArray(user.chantiers)) ? user.chantiers : [];
   renderChantierField(window._currentAuthorizedChantiers);
   document.getElementById("chantierErr").style.display = "none";
@@ -1068,6 +1094,8 @@ function renderChantierField(chantiers) {
 
 async function saveBL() {
   var bl = document.getElementById("blInput").value.trim().toUpperCase();
+  var lienBlEl = document.getElementById("lienBlInput");
+  var lienBl = lienBlEl ? lienBlEl.value.trim() : "";
   var chantier = document.getElementById("chantierInput").value.trim();
   var errEl = document.getElementById("chantierErr");
   var blErrEl = document.getElementById("blErr");
@@ -1098,7 +1126,8 @@ async function saveBL() {
     var { data, error } = await supabase.rpc('validate_passage_chantier', {
       p_passage_id: currentPassageId,
       p_chantier: chantier,
-      p_bon_livraison: bl || null
+      p_bon_livraison: bl || null,
+      p_lien_bl: lienBl || null
     });
     if (error) throw error;
     saved = data === true;
@@ -1150,6 +1179,14 @@ async function loadHistorique() {
     document.getElementById("histoList").innerHTML = passages.map(function(p) {
       var date = p.created_at ? new Date(p.created_at).toLocaleDateString("fr-FR") + " " + new Date(p.created_at).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"}) : "—";
       var ok = p.resultat === "AUTORISE";
+      // Le lien du bon de livraison n'est pas toujours disponible au moment
+      // du scan (il vient souvent du logiciel de compta du négociant, généré
+      // après coup) : on l'affiche s'il existe, et on permet toujours de
+      // l'ajouter ou de le corriger depuis l'historique.
+      var lienBlHtml = p.lien_bl
+        ? '<a href="'+esc(p.lien_bl)+'" target="_blank" rel="noopener" class="histo-bl" style="text-decoration:underline">🔗 Lien BL</a>'
+          +' <span class="histo-bl" style="cursor:pointer;opacity:0.7" onclick="editLienBl('+p.id+',\''+escJsAttr(p.lien_bl)+'\')">✏️</span>'
+        : '<span class="histo-bl" style="cursor:pointer;opacity:0.7" onclick="editLienBl('+p.id+',\'\')">➕ Lien BL</span>';
       return '<div class="histo-item">'+
         '<div class="histo-top">'+
           '<div class="histo-name">'+esc(p.nom_salarie)+'</div>'+
@@ -1159,12 +1196,31 @@ async function loadHistorique() {
           '<span>'+date+'</span>'+
           '<span style="font-family:monospace">'+esc(p.code_salarie)+'</span>'+
           (p.bon_livraison?'<span class="histo-bl">BL '+esc(p.bon_livraison)+'</span>':'')+
+          (ok ? lienBlHtml : '')+
         '</div>'+
       '</div>';
     }).join("");
   } catch(e) {
     document.getElementById("histoList").innerHTML = '<div style="text-align:center;padding:24px;color:var(--muted)">⚠️ Erreur de chargement</div>';
   }
+}
+
+// Ajoute ou corrige le lien du bon de livraison d'un passage déjà validé —
+// utile car ce lien vient souvent du logiciel de compta du négociant,
+// généré après coup, une fois le scan déjà effectué. set_passage_lien_bl
+// vérifie côté serveur que le passage appartient bien à l'agence appelante.
+async function editLienBl(passageId, current) {
+  var value = prompt("Lien du bon de livraison :", current || "");
+  if (value === null) return; // annulé
+  try {
+    var { data, error } = await supabase.rpc('set_passage_lien_bl', { p_passage_id: passageId, p_lien_bl: value.trim() || null });
+    if (error || !data) throw (error || new Error("échec"));
+  } catch(e) {
+    console.error("editLienBl error", e);
+    alert("❌ " + frError(e));
+    return;
+  }
+  loadHistorique();
 }
 
 async function startCam() {
