@@ -309,13 +309,6 @@ body{font-family:'Inter',sans-serif;background:var(--bg);display:flex;flex-direc
 
   <!-- SCAN -->
   <div style="padding:14px;gap:12px;display:flex;flex-direction:column" id="scanSection">
-    <!-- Champ invisible et non cliquable (position hors écran) : reçoit les
-         frappes clavier envoyées par une douchette USB (elle "tape" le
-         contenu scanné comme un clavier physique, elle ne passe pas par la
-         caméra). Comme il n'est pas cliquable ni visible, personne ne peut
-         y taper un code à la main via l'interface — seule la douchette,
-         qui exige la présence physique de la carte/du QR, peut l'alimenter. -->
-    <input id="scanCapture" type="text" tabindex="-1" autocomplete="off" autocorrect="off" spellcheck="false" style="position:absolute;opacity:0;pointer-events:none;width:1px;height:1px;top:-9999px;left:-9999px" onkeydown="if(event.key==='Enter')captureScanInput()">
     <div class="scan-card">
       <div class="cam-wrap">
         <video id="video" autoplay playsinline muted></video>
@@ -592,25 +585,51 @@ async function submitForcePassword() {
   enterAppNego();
 }
 
-// Reporte le focus sur le champ invisible #scanCapture, pour que la
-// douchette USB (qui tape ses résultats comme un clavier) continue à
-// fonctionner même sans champ de saisie visible.
-function focusManualInput() {
-  setTimeout(function(){ var f = document.getElementById("scanCapture"); if (f) f.focus(); }, 50);
-}
+// Ne fait plus rien : remplacé par l'écoute clavier globale ci-dessous
+// (voir scanBuffer), plus fiable qu'un champ invisible qui pouvait perdre
+// le focus sur Safari et faire s'accumuler plusieurs scans à la suite.
+// Conservée en no-op pour ne pas casser les appels existants.
+function focusManualInput() {}
 
-// Appelée quand la douchette USB termine un scan (elle envoie un "Entrée"
-// après le contenu décodé). Même niveau de confiance qu'un scan caméra
-// (pas de PIN) : ça exige la présence physique de la carte/du QR du
-// salarié, contrairement à une saisie manuelle à la main.
-function captureScanInput() {
-  var el = document.getElementById("scanCapture");
-  var raw = el.value.trim();
-  el.value = "";
-  if (!raw) return;
-  var code = extractCode(raw);
-  if (code) showResult(code);
-}
+// ── Capture des scans de la douchette USB, au niveau du document ──
+// Une douchette qui se comporte comme un clavier tape très vite (quelques
+// dizaines de ms entre caractères) puis envoie "Entrée". On accumule les
+// caractères tant qu'ils arrivent rapidement, et on traite le tout comme
+// un code scanné dès qu'un délai un peu plus long est détecté avant
+// "Entrée" OU dès la réception de "Entrée" elle-même. Contrairement à un
+// champ de saisie ciblé, ça ne dépend d'aucun focus donc ça ne peut pas
+// perdre des caractères ni accumuler plusieurs scans entre eux.
+var scanBuffer = "";
+var scanBufferTime = 0;
+document.addEventListener("keydown", function(e) {
+  // Ne jamais intercepter si un vrai champ de saisie est actif (mot de
+  // passe, connexion, n° de BL, chantier...) : on laisse la personne
+  // taper normalement dans ces cas-là.
+  var ae = document.activeElement;
+  var tag = ae ? ae.tagName : "";
+  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+
+  // Utile uniquement sur l'écran de scan (pas pendant l'affichage d'un
+  // résultat, ni sur les autres onglets) : voir resetScan() pour revenir
+  // ici après un scan.
+  var scanSectionEl = document.getElementById("scanSection");
+  if (!scanSectionEl || scanSectionEl.style.display === "none") { scanBuffer = ""; return; }
+
+  var now = Date.now();
+  if (now - scanBufferTime > 150) scanBuffer = "";
+  scanBufferTime = now;
+
+  if (e.key === "Enter") {
+    var raw = scanBuffer.trim();
+    scanBuffer = "";
+    if (raw) {
+      var code = extractCode(raw);
+      if (code) showResult(code);
+    }
+    return;
+  }
+  if (e.key && e.key.length === 1) scanBuffer += e.key;
+});
 
 // Extrait le code salarié depuis le contenu brut d'un QR (ou d'une saisie/scan USB) :
 // si c'est une URL contenant un paramètre "v", on l'utilise ; sinon on prend le texte tel quel.
