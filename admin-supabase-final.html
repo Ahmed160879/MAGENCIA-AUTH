@@ -437,6 +437,36 @@ var salPhotoData = null;
 // ── AUTH ──
 var supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+// Traduit les messages d'erreur techniques (souvent en anglais, venant de
+// Supabase Auth/Storage ou du réseau) en français compréhensible. Si le
+// message n'est pas reconnu — par exemple nos propres messages d'erreur
+// SQL, déjà écrits en français — on le laisse tel quel plutôt que de le
+// remplacer par un message générique qui ferait perdre l'information.
+function frError(err) {
+  var raw = (err && err.message) ? err.message : (typeof err === "string" ? err : "");
+  if (raw) console.error("Erreur technique:", raw);
+  var map = [
+    [/invalid login credentials/i, "Identifiants incorrects"],
+    [/email not confirmed/i, "Email non confirmé"],
+    [/user already registered/i, "Un compte existe déjà avec cet email"],
+    [/password should be at least/i, "Le mot de passe est trop court"],
+    [/new password should be different/i, "Le nouveau mot de passe doit être différent de l'ancien"],
+    [/for security purposes.*seconds/i, "Trop de tentatives — patientez quelques secondes avant de réessayer"],
+    [/email rate limit exceeded/i, "Trop d'emails envoyés — réessayez plus tard"],
+    [/token has expired or is invalid/i, "Ce lien a expiré ou n'est plus valide"],
+    [/unable to validate email address/i, "Adresse email invalide"],
+    [/resource already exists/i, "Ce fichier existe déjà"],
+    [/payload too large|exceeded the maximum allowed size/i, "Fichier trop volumineux"],
+    [/duplicate key value violates unique constraint/i, "Cette valeur est déjà utilisée"],
+    [/failed to fetch|networkerror/i, "Connexion au serveur impossible — vérifiez votre connexion internet"],
+    [/jwt expired/i, "Votre session a expiré — reconnectez-vous"]
+  ];
+  for (var i = 0; i < map.length; i++) {
+    if (map[i][0].test(raw)) return map[i][1];
+  }
+  return raw || "Une erreur est survenue. Réessayez.";
+}
+
 // Échappement HTML — à utiliser systématiquement pour toute donnée
 // (nom, message, chantier, etc.) insérée via innerHTML, afin d'éviter
 // qu'un texte du type <script> saisi quelque part dans l'app ne
@@ -609,9 +639,9 @@ async function deleteNegociant(authUserId, agence) {
   if (!confirm("⚠️ Supprimer définitivement l'agence " + agence + " ?\n\nElle ne pourra plus se connecter à NégoceID. Cette action est irréversible.")) return;
   try {
     var { data, error } = await supabase.rpc('delete_negociant', { p_auth_user_id: authUserId });
-    if (error) { alert("❌ Échec de la suppression :\n" + error.message); return; }
+    if (error) { alert("❌ Échec de la suppression :\n" + frError(error)); return; }
     if (!data) { alert("❌ Suppression impossible pour cette agence."); return; }
-  } catch(e) { alert("❌ Erreur :\n" + e.message); return; }
+  } catch(e) { alert("❌ Erreur :\n" + frError(e)); return; }
   loadNegociants();
   alert("🗑️ Agence supprimée");
 }
@@ -631,7 +661,7 @@ async function resetNegociantPassword(email, agence) {
     alert("✅ Email de réinitialisation envoyé à " + email);
   } catch(e) {
     console.error("resetNegociantPassword error", e);
-    alert("❌ Échec de l'envoi :\n" + e.message);
+    alert("❌ Échec de l'envoi :\n" + frError(e));
   }
 }
 
@@ -645,13 +675,13 @@ async function uploadNegociantLogo(authUserId, inputEl) {
   var path = authUserId + "/logo." + ext;
   try {
     var { error: upErr } = await supabase.storage.from("negociant-logos").upload(path, file, { upsert: true, contentType: file.type });
-    if (upErr) { alert("❌ Échec de l'envoi du logo :\n" + upErr.message); return; }
+    if (upErr) { alert("❌ Échec de l'envoi du logo :\n" + frError(upErr)); return; }
     var { data } = supabase.storage.from("negociant-logos").getPublicUrl(path);
     var publicUrl = (data && data.publicUrl) ? (data.publicUrl + "?t=" + Date.now()) : null;
     if (!publicUrl) { alert("❌ Logo envoyé mais URL introuvable."); return; }
     var { data: ok, error: rpcErr } = await supabase.rpc("set_negociant_logo", { p_auth_user_id: authUserId, p_logo_url: publicUrl });
-    if (rpcErr || !ok) { alert("❌ Échec de l'enregistrement du logo :\n" + (rpcErr ? rpcErr.message : "rôle invalide")); return; }
-  } catch(e) { alert("❌ Erreur :\n" + e.message); return; }
+    if (rpcErr || !ok) { alert("❌ Échec de l'enregistrement du logo :\n" + (rpcErr ? frError(rpcErr) : "rôle invalide")); return; }
+  } catch(e) { alert("❌ Erreur :\n" + frError(e)); return; }
   loadNegociants();
 }
 
@@ -693,7 +723,7 @@ async function saveNegociant() {
     if (!res.ok) { alert("❌ Erreur : " + (result.error || "création impossible")); return; }
   } catch(e) {
     if (btn) { btn.disabled = false; btn.textContent = "💾 Créer l'agence"; }
-    alert("❌ Erreur lors de la création : " + e.message);
+    alert("❌ Erreur lors de la création : " + frError(e));
     return;
   }
   closeModal("modalNegociant");
@@ -746,7 +776,7 @@ function renderCompaniesSection() {
 
 async function activateCompany(id) {
   var { error } = await supabase.from('entreprises').update({ statut: 'actif' }).eq('id', id);
-  if (error) { alert("❌ Échec de l'activation :\n" + error.message); return; }
+  if (error) { alert("❌ Échec de l'activation :\n" + frError(error)); return; }
   await loadCompanies();
   renderCompanyBar();
   renderCompaniesSection();
@@ -757,7 +787,7 @@ async function setCompanyStatut(id, newStatut) {
   var label = newStatut === "actif" ? "réactiver" : "désactiver";
   if (!confirm("Confirmer : " + label + " cette entreprise ?" + (newStatut==="inactif" ? "\n\nSes salariés ne seront plus reconnus comme autorisés chez les négociants." : ""))) return;
   var { error } = await supabase.from('entreprises').update({ statut: newStatut }).eq('id', id);
-  if (error) { alert("❌ Échec :\n" + error.message); return; }
+  if (error) { alert("❌ Échec :\n" + frError(error)); return; }
   await loadCompanies();
   renderCompanyBar();
   renderCompaniesSection();
@@ -771,9 +801,9 @@ async function deleteCompany(id, nom) {
   if (!confirm("Dernière confirmation — vraiment supprimer " + nom + " et toutes ses données ?")) return;
   try {
     var { data, error } = await supabase.rpc('delete_entreprise_cascade', { p_id: id });
-    if (error) { alert("❌ Échec de la suppression :\n" + error.message); return; }
+    if (error) { alert("❌ Échec de la suppression :\n" + frError(error)); return; }
     if (!data) { alert("❌ Suppression impossible pour cette entreprise."); return; }
-  } catch(e) { alert("❌ Erreur :\n" + e.message); return; }
+  } catch(e) { alert("❌ Erreur :\n" + frError(e)); return; }
   await loadCompanies();
   renderCompanyBar();
   renderCompaniesSection();
@@ -841,7 +871,7 @@ async function sendResetEmail() {
     redirectTo: window.location.origin + window.location.pathname
   });
   if (error) {
-    errEl.textContent = "❌ " + error.message;
+    errEl.textContent = "❌ " + frError(error);
     errEl.style.display = "block";
     return;
   }
@@ -856,7 +886,7 @@ async function submitNewPassword() {
   if (pwd1.length < 8) { errEl.textContent = "❌ Le mot de passe doit faire au moins 8 caractères"; errEl.style.display = "block"; return; }
   if (pwd1 !== pwd2) { errEl.textContent = "❌ Les mots de passe ne correspondent pas"; errEl.style.display = "block"; return; }
   var { error } = await supabase.auth.updateUser({ password: pwd1 });
-  if (error) { errEl.textContent = "❌ " + error.message; errEl.style.display = "block"; return; }
+  if (error) { errEl.textContent = "❌ " + frError(error); errEl.style.display = "block"; return; }
   document.getElementById("screenNewPwd").style.display = "none";
   document.getElementById("screenLogin").style.display = "flex";
   alert("✅ Mot de passe mis à jour, vous pouvez vous reconnecter.");
@@ -1100,7 +1130,7 @@ async function saveCompany() {
     COMPANIES.push({id: result.id, nom:nom, prefix:prefix, siret:siret, email_admin:email});
   } catch(e) {
     if (btn) { btn.disabled = false; btn.textContent = "💾 Créer l'entreprise"; }
-    alert("❌ Erreur lors de la création : " + e.message);
+    alert("❌ Erreur lors de la création : " + frError(e));
     return;
   }
   closeModal("modalCompany");
@@ -1308,14 +1338,14 @@ async function uploadSalPhotoBlob(companyId, blob, silent) {
     var { error } = await supabase.storage.from("salarie-photos").upload(path, blob, { contentType: "image/jpeg" });
     if (error) {
       console.error("uploadSalPhotoBlob error", error);
-      if (!silent) alert("❌ Échec de l'envoi de la photo :\n" + error.message);
+      if (!silent) alert("❌ Échec de l'envoi de la photo :\n" + frError(error));
       return null;
     }
     var { data } = supabase.storage.from("salarie-photos").getPublicUrl(path);
     return (data && data.publicUrl) ? data.publicUrl : null;
   } catch (e) {
     console.error("uploadSalPhotoBlob error", e);
-    if (!silent) alert("❌ Échec de l'envoi de la photo :\n" + e.message);
+    if (!silent) alert("❌ Échec de l'envoi de la photo :\n" + frError(e));
     return null;
   }
 }
@@ -1343,7 +1373,7 @@ async function migrateSalariesPhotosToStorage() {
   if (!confirm("Migrer toutes les photos encore stockées en base64 vers le stockage Supabase ?\n\nLes photos restent identiques, seul leur emplacement de stockage change. Sans risque, peut être relancée si interrompue.")) return;
   statusEl.textContent = "⏳ Recherche des photos à migrer...";
   var { data, error } = await supabase.from("salaries").select("code,company_id,photo").like("photo", "data:image%");
-  if (error) { statusEl.textContent = "❌ Erreur : " + error.message; return; }
+  if (error) { statusEl.textContent = "❌ Erreur : " + frError(error); return; }
   var rows = Array.isArray(data) ? data : [];
   if (rows.length === 0) { statusEl.textContent = "✅ Aucune photo à migrer — tout est déjà sur le stockage."; return; }
   var done = 0, failed = 0;
@@ -1462,7 +1492,7 @@ async function saveSalarie() {
         console.error("saveSalarie update failed", error);
         var friendly = error.message.includes("duplicate key") && error.message.includes("email") ? "❌ Cet email est déjà utilisé par un autre salarié."
           : error.message.includes("duplicate key") && error.message.includes("telephone") ? "❌ Ce téléphone est déjà utilisé par un autre salarié."
-          : "❌ Échec de la modification :\n" + error.message;
+          : "❌ Échec de la modification :\n" + frError(error);
         alert(friendly);
         return;
       }
@@ -1472,12 +1502,12 @@ async function saveSalarie() {
         console.error("saveSalarie insert failed", error2);
         var friendly2 = error2.message.includes("duplicate key") && error2.message.includes("email") ? "❌ Cet email est déjà utilisé par un autre salarié."
           : error2.message.includes("duplicate key") && error2.message.includes("telephone") ? "❌ Ce téléphone est déjà utilisé par un autre salarié."
-          : "❌ Échec de l'ajout :\n" + error2.message;
+          : "❌ Échec de l'ajout :\n" + frError(error2);
         alert(friendly2);
         return;
       }
     }
-  } catch(e) { console.error("saveSalarie error", e); alert("❌ Erreur :\n" + e.message); return; }
+  } catch(e) { console.error("saveSalarie error", e); alert("❌ Erreur :\n" + frError(e)); return; }
   closeModal("modalSalarie");
   loadData();
 }
@@ -1486,9 +1516,9 @@ async function resetSalariePin(code) {
   if (!confirm("Réinitialiser le mot de passe de " + code + " ?\n\nÀ sa prochaine connexion, le salarié choisira un nouveau mot de passe.")) return;
   try {
     var { data, error } = await supabase.rpc('reset_salarie_pin', { p_code: code });
-    if (error || !data) { alert("❌ Échec de la réinitialisation :\n" + (error ? error.message : "")); return; }
+    if (error || !data) { alert("❌ Échec de la réinitialisation :\n" + (error ? frError(error) : "")); return; }
     alert("✅ Mot de passe réinitialisé — " + code + " en choisira un nouveau à sa prochaine connexion.");
-  } catch(e) { console.error("resetSalariePin error", e); alert("❌ Erreur :\n" + e.message); }
+  } catch(e) { console.error("resetSalariePin error", e); alert("❌ Erreur :\n" + frError(e)); }
 }
 
 async function toggleStatut(code, currentStatut) {
@@ -1496,8 +1526,8 @@ async function toggleStatut(code, currentStatut) {
   if (!confirm((newStatut==="INACTIF"?"Désactiver":"Réactiver")+" "+code+" ?")) return;
   try {
     var { error } = await supabase.from('salaries').update({statut:newStatut}).eq('code', code);
-    if (error) { console.error("toggleStatut failed", error); alert("❌ Échec de l'opération :\n" + error.message); return; }
-  } catch(e) { console.error("toggleStatut error", e); alert("❌ Erreur :\n" + e.message); return; }
+    if (error) { console.error("toggleStatut failed", error); alert("❌ Échec de l'opération :\n" + frError(error)); return; }
+  } catch(e) { console.error("toggleStatut error", e); alert("❌ Erreur :\n" + frError(e)); return; }
   loadData();
 }
 
@@ -1505,8 +1535,8 @@ async function deleteSalarie(code) {
   if (!confirm("⚠️ Supprimer définitivement " + code + " ?\n\nCette action est irréversible.")) return;
   try {
     var { error } = await supabase.from('salaries').delete().eq('code', code);
-    if (error) { console.error("deleteSalarie failed", error); alert("❌ Échec de la suppression :\n" + error.message); return; }
-  } catch(e) { console.error("deleteSalarie error", e); alert("❌ Erreur :\n" + e.message); return; }
+    if (error) { console.error("deleteSalarie failed", error); alert("❌ Échec de la suppression :\n" + frError(error)); return; }
+  } catch(e) { console.error("deleteSalarie error", e); alert("❌ Erreur :\n" + frError(e)); return; }
   loadData();
 }
 

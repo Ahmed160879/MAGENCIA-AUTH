@@ -415,6 +415,36 @@ var SUPABASE_URL = "https://rzveghiwbjafmfhrfscb.supabase.co";
 var SUPABASE_KEY = "sb_publishable_Hb6ILSc7bzW_sC6ZD2X7Nw_QP5homkU";
 var supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+// Traduit les messages d'erreur techniques (souvent en anglais, venant de
+// Supabase Auth/Storage ou du réseau) en français compréhensible. Si le
+// message n'est pas reconnu — par exemple nos propres messages d'erreur
+// SQL, déjà écrits en français — on le laisse tel quel plutôt que de le
+// remplacer par un message générique qui ferait perdre l'information.
+function frError(err) {
+  var raw = (err && err.message) ? err.message : (typeof err === "string" ? err : "");
+  if (raw) console.error("Erreur technique:", raw);
+  var map = [
+    [/invalid login credentials/i, "Identifiants incorrects"],
+    [/email not confirmed/i, "Email non confirmé"],
+    [/user already registered/i, "Un compte existe déjà avec cet email"],
+    [/password should be at least/i, "Le mot de passe est trop court"],
+    [/new password should be different/i, "Le nouveau mot de passe doit être différent de l'ancien"],
+    [/for security purposes.*seconds/i, "Trop de tentatives — patientez quelques secondes avant de réessayer"],
+    [/email rate limit exceeded/i, "Trop d'emails envoyés — réessayez plus tard"],
+    [/token has expired or is invalid/i, "Ce lien a expiré ou n'est plus valide"],
+    [/unable to validate email address/i, "Adresse email invalide"],
+    [/resource already exists/i, "Ce fichier existe déjà"],
+    [/payload too large|exceeded the maximum allowed size/i, "Fichier trop volumineux"],
+    [/duplicate key value violates unique constraint/i, "Cette valeur est déjà utilisée"],
+    [/failed to fetch|networkerror/i, "Connexion au serveur impossible — vérifiez votre connexion internet"],
+    [/jwt expired/i, "Votre session a expiré — reconnectez-vous"]
+  ];
+  for (var i = 0; i < map.length; i++) {
+    if (map[i][0].test(raw)) return map[i][1];
+  }
+  return raw || "Une erreur est survenue. Réessayez.";
+}
+
 // Échappement HTML — utilisé pour toute donnée insérée via innerHTML
 // (message envoyé par un salarié, nom, chantier...) afin d'empêcher
 // qu'un texte du type <script> ne s'exécute dans cette session négociant.
@@ -639,23 +669,23 @@ async function saveNegoLogo() {
       var ext = (file.name.split(".").pop() || "png").toLowerCase().replace(/[^a-z0-9]/g, "") || "png";
       var path = currentNegoAuthUserId + "/logo." + ext;
       var { error: upErr } = await supabase.storage.from("negociant-logos").upload(path, file, { upsert: true, contentType: file.type });
-      if (upErr) throw new Error("Échec de l'envoi de l'image : " + upErr.message);
+      if (upErr) throw new Error("Échec de l'envoi de l'image : " + frError(upErr));
       var { data: pub } = supabase.storage.from("negociant-logos").getPublicUrl(path);
       if (!pub || !pub.publicUrl) throw new Error("Image envoyée mais URL introuvable");
       newLogoUrl = pub.publicUrl + "?t=" + Date.now();
       var { data: okLogo, error: logoRpcErr } = await supabase.rpc('set_my_negociant_logo', { p_logo_url: newLogoUrl });
-      if (logoRpcErr || !okLogo) throw new Error(logoRpcErr ? logoRpcErr.message : "Échec de l'enregistrement du logo");
+      if (logoRpcErr || !okLogo) throw new Error(logoRpcErr ? frError(logoRpcErr) : "Échec de l'enregistrement du logo");
     }
 
     var { data: okTexte, error: texteRpcErr } = await supabase.rpc('set_my_negociant_texte', { p_texte: texte || null });
-    if (texteRpcErr || !okTexte) throw new Error(texteRpcErr ? texteRpcErr.message : "Échec de l'enregistrement du texte");
+    if (texteRpcErr || !okTexte) throw new Error(texteRpcErr ? frError(texteRpcErr) : "Échec de l'enregistrement du texte");
 
     applyNegoBranding(newLogoUrl || currentNegoLogoUrl, texte);
     if (fileEl) fileEl.value = "";
     okEl.style.display = "block";
   } catch(e) {
     console.error("saveNegoLogo error", e);
-    errEl.textContent = "❌ " + (e && e.message ? e.message : "Échec de l'enregistrement");
+    errEl.textContent = "❌ " + (e && e.message ? frError(e) : "Échec de l'enregistrement");
     errEl.style.display = "block";
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = "✓ Enregistrer"; }
@@ -767,7 +797,7 @@ async function submitForcePassword() {
   if (p1.length < 8) { errEl.textContent = "❌ Le mot de passe doit faire au moins 8 caractères"; errEl.style.display = "block"; return; }
   if (p1 !== p2) { errEl.textContent = "❌ Les mots de passe ne correspondent pas"; errEl.style.display = "block"; return; }
   var { error } = await supabase.auth.updateUser({ password: p1 });
-  if (error) { errEl.textContent = "❌ " + error.message; errEl.style.display = "block"; return; }
+  if (error) { errEl.textContent = "❌ " + frError(error); errEl.style.display = "block"; return; }
   try { await supabase.rpc('clear_must_change_password'); } catch(e) { console.error("clear_must_change_password error", e); }
   document.getElementById("forcePwd1").value = "";
   document.getElementById("forcePwd2").value = "";
@@ -1242,7 +1272,7 @@ async function sendResetNego() {
     redirectTo: window.location.origin + window.location.pathname + window.location.search
   });
   if (resetErr) {
-    errEl.textContent = "❌ " + resetErr.message;
+    errEl.textContent = "❌ " + frError(resetErr);
     errEl.style.display = "block";
     return;
   }
@@ -1257,7 +1287,7 @@ async function submitNewPasswordNego() {
   if (p1.length < 8) { errEl.textContent = "❌ Le mot de passe doit faire au moins 8 caractères"; errEl.style.display = "block"; return; }
   if (p1 !== p2) { errEl.textContent = "❌ Les mots de passe ne correspondent pas"; errEl.style.display = "block"; return; }
   var { error } = await supabase.auth.updateUser({ password: p1 });
-  if (error) { errEl.textContent = "❌ " + error.message; errEl.style.display = "block"; return; }
+  if (error) { errEl.textContent = "❌ " + frError(error); errEl.style.display = "block"; return; }
   try { await supabase.rpc('clear_must_change_password'); } catch(e) { console.error("clear_must_change_password error", e); }
   document.getElementById("sNewPwdNego").classList.add("hidden");
   document.getElementById("sLogin").classList.remove("hidden");
