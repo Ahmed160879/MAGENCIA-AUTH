@@ -172,6 +172,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);display:flex;flex-direc
     <div class="hdr-nego" id="hdrNego">—</div>
     <div class="hdr-clock" id="hdrClock">--:--:--</div>
     <div id="hdrPwdLink" class="hidden" style="font-size:10px;color:rgba(255,255,255,0.55);text-decoration:underline;cursor:pointer;margin-top:3px" onclick="goToChangePasswordNego()">🔑 Mot de passe</div>
+    <div id="hdrLogoutLink" class="hidden" style="font-size:10px;color:rgba(255,255,255,0.55);text-decoration:underline;cursor:pointer;margin-top:3px" onclick="logout()">🚪 Déconnexion</div>
   </div>
 </div>
 
@@ -372,6 +373,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);display:flex;flex-direc
       <div class="err" id="negLogoOk" style="margin-top:8px;max-width:none;background:#EDFBF3;color:#0CAF60">✅ Enregistré</div>
     </div>
   </div>
+  <button class="btn-out" onclick="logout()">← Déconnexion</button>
 </div>
 
 <!-- HISTORIQUE -->
@@ -560,6 +562,7 @@ function enterAppNego() {
   document.getElementById("sLogin").classList.add("hidden");
   document.getElementById("tabBar").classList.remove("hidden");
   document.getElementById("hdrPwdLink").classList.remove("hidden");
+  document.getElementById("hdrLogoutLink").classList.remove("hidden");
   document.getElementById("sScan").classList.remove("hidden");
   // Focus le champ de saisie manuelle : permet à un lecteur de code-barres/QR USB
   // (qui se comporte comme un clavier) de scanner directement sans clic préalable.
@@ -1207,6 +1210,7 @@ async function logout() {
   document.getElementById("loginPwd").value = "";
   document.getElementById("tabBar").classList.add("hidden");
   document.getElementById("hdrPwdLink").classList.add("hidden");
+  document.getElementById("hdrLogoutLink").classList.add("hidden");
   document.getElementById("sScan").classList.add("hidden");
   document.getElementById("sHistorique").classList.add("hidden");
   document.getElementById("sDemandesNego").classList.add("hidden");
