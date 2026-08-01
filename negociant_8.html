@@ -308,7 +308,8 @@ body{font-family:'Inter',sans-serif;background:var(--bg);display:flex;flex-direc
           <div class="bl-optional">Optionnel</div>
         </div>
         <div class="bl-row">
-          <input class="bl-input" id="lienBlInput" type="url" placeholder="Lien vers le document (si déjà disponible)" autocomplete="off" autocorrect="off" spellcheck="false" onfocus="cancelAutoReset()">
+          <input class="bl-input" id="lienBlInput" type="url" placeholder="Lien vers le document (si déjà disponible)" autocomplete="off" autocorrect="off" spellcheck="false" onfocus="cancelAutoReset()" style="text-transform:none;letter-spacing:normal;font-family:inherit;font-weight:500;font-size:13px">
+          <button type="button" onclick="pasteLienBl('lienBlInput')" title="Coller depuis le presse-papiers" style="flex-shrink:0;padding:0 14px;border-radius:12px;border:1.5px solid rgba(255,255,255,0.25);background:rgba(255,255,255,0.08);color:#fff;font-size:12px;font-weight:700;cursor:pointer">📋 Coller</button>
         </div>
       </div>
       <button class="bl-btn" style="width:100%;margin-top:14px;padding:14px" onclick="saveBL()">✓ Valider le retrait pour ce chantier</button>
@@ -1205,12 +1206,37 @@ async function loadHistorique() {
   }
 }
 
+// Récupère automatiquement le lien depuis le presse-papiers, pour éviter
+// au négociant de le retaper à la main : il copie le lien dans son propre
+// logiciel de compta, revient sur NégoceID, et un clic suffit à le coller.
+async function pasteLienBl(inputId) {
+  var el = document.getElementById(inputId);
+  if (!el) return;
+  try {
+    var text = await navigator.clipboard.readText();
+    if (text) el.value = text.trim();
+  } catch(e) {
+    console.error("pasteLienBl error", e);
+    alert("❌ Impossible de lire le presse-papiers automatiquement — collez le lien manuellement dans le champ (Cmd+V / Ctrl+V).");
+  }
+}
+
 // Ajoute ou corrige le lien du bon de livraison d'un passage déjà validé —
 // utile car ce lien vient souvent du logiciel de compta du négociant,
-// généré après coup, une fois le scan déjà effectué. set_passage_lien_bl
-// vérifie côté serveur que le passage appartient bien à l'agence appelante.
+// généré après coup, une fois le scan déjà effectué. Si rien n'est encore
+// enregistré, on pré-remplit automatiquement avec le contenu du
+// presse-papiers s'il ressemble à un lien — la plupart du temps, il n'y a
+// alors plus qu'à valider. set_passage_lien_bl vérifie côté serveur que le
+// passage appartient bien à l'agence appelante.
 async function editLienBl(passageId, current) {
-  var value = prompt("Lien du bon de livraison :", current || "");
+  var suggestion = current || "";
+  if (!suggestion) {
+    try {
+      var clip = (await navigator.clipboard.readText() || "").trim();
+      if (/^https?:\/\//i.test(clip)) suggestion = clip;
+    } catch(e) { /* pas grave, on laisse le champ vide */ }
+  }
+  var value = prompt("Lien du bon de livraison :", suggestion);
   if (value === null) return; // annulé
   try {
     var { data, error } = await supabase.rpc('set_passage_lien_bl', { p_passage_id: passageId, p_lien_bl: value.trim() || null });
