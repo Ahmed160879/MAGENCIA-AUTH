@@ -269,6 +269,8 @@ function esc(v) {
 }
 
 var currentCode = null;
+var currentPin = null; // gardé en mémoire (jamais persisté) pour revalider chaque
+                        // appel sensible côté serveur — voir loadBL/sendDemande/loadMesDemandes.
 var pendingUser = null;
 
 async function fetchSalarie(code) {
@@ -283,7 +285,7 @@ async function loadBL() {
   if (!currentCode) return;
   document.getElementById("blList").innerHTML = '<div class="bl-empty"><div class="bl-empty-icon">⏳</div>Chargement...</div>';
   try {
-    var { data: passages, error } = await supabase.rpc('get_passages_by_code', { p_code: currentCode });
+    var { data: passages, error } = await supabase.rpc('get_passages_by_code', { p_code: currentCode, p_pin: currentPin });
     if (error) throw error;
     if (!Array.isArray(passages)) passages = [];
 
@@ -408,7 +410,8 @@ async function sendDemande() {
       p_nom_salarie: currentUser ? currentUser.nom : currentCode,
       p_chantier: chantier,
       p_agence_cible: agence,
-      p_message: message
+      p_message: message,
+      p_pin: currentPin
     });
     if (error) throw error;
     document.getElementById("dmdMessage").value = "";
@@ -426,7 +429,7 @@ async function loadMesDemandes() {
   var list = document.getElementById("dmdList");
   list.innerHTML = '<div style="text-align:center;padding:24px;color:var(--muted)">⏳ Chargement...</div>';
   try {
-    var { data, error } = await supabase.rpc('get_demandes_by_salarie', { p_code: currentCode });
+    var { data, error } = await supabase.rpc('get_demandes_by_salarie', { p_code: currentCode, p_pin: currentPin });
     if (error) throw error;
     var demandes = Array.isArray(data) ? data : [];
     if (demandes.length === 0) {
@@ -518,6 +521,7 @@ async function quickFaceIdLogin() {
   // sous le code interne résolu (cas où Face ID a été activé via un autre
   // des trois identifiants équivalents — voir checkFaceIdAvailableAsync).
   var cred = localStorage.getItem("webauthn_cred_" + raw) || (code && localStorage.getItem("webauthn_cred_" + code));
+  var storedPin = localStorage.getItem("webauthn_pin_" + raw) || (code && localStorage.getItem("webauthn_pin_" + code));
   if (!cred) { document.getElementById("loading").style.display = "none"; return; }
   var user = code ? await fetchSalarie(code) : null;
   document.getElementById("loading").style.display = "none";
@@ -541,7 +545,10 @@ async function quickFaceIdLogin() {
         timeout: 60000
       }
     });
-    if (assertion) showCarte(pendingUser);
+    if (assertion) {
+      currentPin = storedPin || null;
+      showCarte(pendingUser);
+    }
   } catch(e) {
     console.error("quickFaceIdLogin error", e);
     errEl.textContent = "Face ID indisponible — utilisez votre identifiant et votre mot de passe";
@@ -611,6 +618,11 @@ async function login() {
     return;
   }
 
+  // Gardé en mémoire (jamais dans localStorage pour une connexion classique) :
+  // nécessaire pour revalider "Mes BL" et "Demande" côté serveur ensuite,
+  // au lieu de faire confiance à la simple présence de currentCode.
+  currentPin = pwd;
+
   await maybeOfferFaceId();
 }
 
@@ -650,6 +662,16 @@ async function enableFaceId() {
     // fois, quel que soit celui des trois que la personne utilise.
     if (lastIdentifiantRaw && lastIdentifiantRaw !== currentCode) {
       localStorage.setItem("webauthn_cred_" + lastIdentifiantRaw, rawId);
+    }
+    // Le PIN doit aussi être stocké ici : "Mes BL" et "Demande" le revalident
+    // désormais côté serveur à chaque appel (audit de sécurité), pas
+    // seulement au login. Sans ça, une connexion Face ID ne pourrait plus
+    // accéder à ces deux onglets. Stocké au même endroit et avec la même
+    // protection que la clé Face ID elle-même (stockage propre à cet
+    // appareil, jamais transmis ailleurs qu'à NégoceID).
+    localStorage.setItem("webauthn_pin_" + currentCode, currentPin);
+    if (lastIdentifiantRaw && lastIdentifiantRaw !== currentCode) {
+      localStorage.setItem("webauthn_pin_" + lastIdentifiantRaw, currentPin);
     }
     faceIdOk = true;
   } catch(e) { console.error("enableFaceId error", e); }
@@ -711,6 +733,7 @@ function showCarte(user) {
 
 function out() {
   currentCode = null;
+  currentPin = null;
   pendingUser = null;
   currentUser = null;
   document.getElementById("codeIn").value = "";
